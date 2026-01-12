@@ -24,8 +24,8 @@ def read_requirements():
 setup(
     name='sat-lopsidedness',
     version='0.1.0',
-    author='Your Name',
-    author_email='your.email@example.com',
+    author='Alexander Poulin',
+    author_email='',
     description='Satellite Lopsidedness in the TNG-300 and TNG-Cluster simulations',
     long_description=read_readme(),
     long_description_content_type='text/markdown',
