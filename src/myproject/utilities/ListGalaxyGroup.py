@@ -10,10 +10,11 @@ class ListGalaxyGroup:
         self.listGalaxyGroups = listGalaxyGroups
         self.headerInformation = headerInformation
         
-    def __init__(self, h5file : h5.File):
-        self.listGalaxyGroups = []
-        self.headerInformation = {}
-        self.load_from_hdf5(h5file)
+    @classmethod
+    def from_hdf5(cls, h5file : h5.File):
+        instance = cls()
+        instance.load_from_hdf5(h5file)
+        return instance
         
     def addGalaxyGroup(self, galaxyGroup : GalaxyGroup):
         self.listGalaxyGroups.append(galaxyGroup)

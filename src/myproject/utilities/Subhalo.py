@@ -2,8 +2,9 @@
 
 class Subhalo:
 
-    def __init__(self, idx, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities):
+    def __init__(self, idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities):
         self.idx = idx
+        self.group_id = group_id
         self.flag = flag
         self.mass = mass
         self.stellarMass = stellarMass
@@ -15,6 +16,9 @@ class Subhalo:
         
     def getIdx(self):
         return self.idx
+    
+    def getGroupID(self):
+        return self.group_id
     
     def getFlag(self):
         return self.flag
