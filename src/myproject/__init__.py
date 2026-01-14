@@ -11,5 +11,6 @@ __email__ = ""
 
 # Package-level imports can be added here
 from .utilities import *
+import h5py
 # from .data import *
 # from .utils import *

@@ -1,0 +1,72 @@
+
+Need to be able to download the galaxy information and dark matter
+halo information for the TNG300 and TNGCluster
+
+Information that we will want:
+  * spatial coordinates of the galaxies (x,y,z)
+  * locations of the centers of the dark matter halos
+  * luminosities of the galaxies (in the SDSS bandpasses g,r,i,z)
+  * stellar masses of the galaxies (this is something that will need 
+    to be calculated? Bryanne might be the best person to ask how
+    to best define/use the stellar mass - my best guess is that
+    we want to use SubhaloMassType)
+  * radii of the galaxies
+
+Important 1: need to remove any luminous objects that are flagged
+as being "non cosmological in origin" (i.e., we don't want objects 
+with Subhaloflag = 0)
+
+Important 2: need to use the subhalo magnitudes from Nelson et al. (2018)
+to assign luminosities to the galaxies because these include the effects
+of dust obscuration and better approximate what we'd see in the real
+universe (e.g., the Sloan Digital Sky Survey)
+
+Important 3: need to correct the stellar masses of the galaxies following
+Appendix A in Pillepich et al. (2018) because the stellar masses 
+aren't as well converged in TNG300 as in the benchmark TNG100 simulation
+
+Important 4: because the smoothing length used by the TNG300 is
+different for z < 1 and z >= 1 we'll likely want to adopt a minimum 
+size for the galaxies we want to use following Curtis et al. (2026)
+(note: we need to check to see if TNGCluster used the same 
+smoothing length change as TNG300)
+
+We will want catalogs for timesteps corresponding to the following
+redshifts:
+  * 0.0
+  * 0.1
+  * 0.2
+  * 0.3
+  * 0.4
+  * 0.5
+  * 0.7
+  * 1.0
+  * 1.5
+  * 2.0
+  * 3.0
+
+What are we going to study?
+  * ideally, all objects with virial masses >= 10^{13} solar masses,
+    but we may run into challenges with objects with masses
+    < 10^{14} solar masses having more than one dominant galaxy
+    (like the Milky Way and Andromeda in our Local Group); this 
+    is why we want to know the location of the center of each
+    dark matter halo -- the dominant galaxy (or galaxies) may
+    be offset from the center of the dark matter halo
+  * we will want to use "Group_M_Crit200" to define the masses
+    of the groups/clusters; note that these are given in units
+    of 10^{10} M_sun/h
+
+First step after downloading the appropriate catalogs:
+  * for all objects of interest, translate the coordinates in "code"
+    coordinates to a center of mass coordinate system where the
+    central, dominant galaxy is defined to be located at (0,0,0)
+  * assess the degree to which the central, dominant galaxy is
+    offset from the center of the dark matter halo as a function 
+    of the mass of system (i.e., compute offsets in 3D between 
+    the GroupCM and the SubhaloCM for GroupFirstSub)
+  * note: to translate the coordinates of the galaxies into 
+    a center of mass coordinate system, it will be important to
+    take the periodic boundary conditions into account
+
+
