@@ -1,7 +1,7 @@
 from .GalaxyGroup import GalaxyGroup
 from .ListGalaxyGroup import ListGalaxyGroup
 from .Subhalo import Subhalo
-from plottingTools import AstroPlotter
+from .plottingTools import AstroPlotter
 from .iapi_TNG import get, getsub, getHaloField, getredshift, getSubhaloField
 
 __all__ = [

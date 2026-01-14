@@ -6,11 +6,13 @@ import h5py as h5
 import numpy as np
 
 class ListGalaxyGroup:
-    def __init__(self, listGalaxyGroups : list[GalaxyGroup]=[]):
+    def __init__(self, listGalaxyGroups : list[GalaxyGroup]=[], headerInformation : dict={}):
         self.listGalaxyGroups = listGalaxyGroups
+        self.headerInformation = headerInformation
         
     def __init__(self, h5file : h5.File):
         self.listGalaxyGroups = []
+        self.headerInformation = {}
         self.load_from_hdf5(h5file)
         
     def addGalaxyGroup(self, galaxyGroup : GalaxyGroup):
@@ -20,6 +22,10 @@ class ListGalaxyGroup:
         return len(self.listGalaxyGroups)
     
     def save_to_hdf5(self, h5file : h5.File):
+        
+        for key, value in self.headerInformation.items():
+            h5file.attrs[key] = value
+        
         grp = h5file.create_group('GalaxyGroups')
         for i, galaxyGroup in enumerate(self.listGalaxyGroups):
             gg_grp : h5.Group = grp.create_group(f'GalaxyGroup_{i}')
@@ -44,6 +50,9 @@ class ListGalaxyGroup:
                 
     def load_from_hdf5(self, h5file : h5.File):
         self.listGalaxyGroups = []
+        self.headerInformation = {}
+        for key, value in h5file.attrs.items():
+            self.headerInformation[key] = value
         grp = h5file['GalaxyGroups']
         for gg_key in grp:
             gg_grp : h5.Group = grp[gg_key]
