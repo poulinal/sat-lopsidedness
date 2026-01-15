@@ -1,5 +1,7 @@
 # ADP 2026
 
+import numpy as np
+
 class Subhalo:
 
     def __init__(self, idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities):
@@ -43,3 +45,6 @@ class Subhalo:
     
     def getLuminosities(self):
         return self.luminosities
+    
+    def setPosition(self, newPosition : np.ndarray):
+        self.position = newPosition

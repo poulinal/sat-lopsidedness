@@ -6,6 +6,46 @@ import h5py as h5
 import numpy as np
 
 class ListGalaxyGroup:
+    """
+    Class to manage a list of GalaxyGroup objects and perform analyses on them.
+    
+    Can be initialized from an HDF5 file using the from_hdf5 class method or by providing a list of GalaxyGroup objects and header information.
+    
+    Attributes
+    ----------
+    listGalaxyGroups : list[GalaxyGroup]
+        A list containing GalaxyGroup objects.
+    headerInformation : dict
+        A dictionary to store header information about the dataset.
+    list_pairwise_differences : list[list[float]]
+        A list to store pairwise polar angle differences between satellite galaxies in each galaxy group.
+    MRL_values : list[float]
+        A list to store Mean Resultant Length (MRL) directionality values for each galaxy group.
+    Methods
+    -------
+    addGalaxyGroup(galaxyGroup : GalaxyGroup)
+        Adds a GalaxyGroup object to the list.
+    getNumGalaxyGroups() -> int
+        Returns the number of GalaxyGroup objects in the list.
+    getListPairwiseDifferences() -> list[list[float]]
+        Returns the list of pairwise polar angle differences.
+    compute_all_pairwise_polar_differences() -> list[list[float]]
+        Computes all pairwise polar angle differences between satellite galaxies in each galaxy group.
+    compute_probablity_distribution_of_polar_differences(bin_size : float=5.0) -> tuple[np.ndarray, np.ndarray]
+        Computes the probability distribution of polar angle differences.
+    compute_all_MRL_directionality() -> list[float]
+        Computes the Mean Resultant Length (MRL) directionality for each galaxy group.
+    compute_probablity_distribution_of_MRL_directionality(bin_size : float=0.05) -> tuple[np.ndarray, np.ndarray]
+        Computes the probability distribution of MRL directionality.
+    filterSubhalos(minStellarMass : float=None, maxStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000) -> None
+        Filters subhalos in each galaxy group based on specified criteria.
+    correctPositions(boxsize : float) -> None
+        Corrects the positions of subhalos in each galaxy group to account for periodic boundary conditions.
+    save_to_hdf5(h5file : h5.File, overwrite : bool=True) -> None
+        Saves the ListGalaxyGroup data to an HDF5 file.
+    load_from_hdf5(h5file : h5.File) -> None
+        Loads the ListGalaxyGroup data from an HDF5 file.
+    """
     def __init__(self, listGalaxyGroups : list[GalaxyGroup]=[], headerInformation : dict={}):
         self.listGalaxyGroups = listGalaxyGroups
         self.headerInformation = headerInformation
@@ -24,77 +64,8 @@ class ListGalaxyGroup:
     def getNumGalaxyGroups(self):
         return len(self.listGalaxyGroups)
     
-    def save_to_hdf5(self, h5file : h5.File, overwrite : bool=True):
-        
-        if not overwrite:
-            #check which groups already exist
-            existing_groups = set(h5file['GalaxyGroups'].keys()) if 'GalaxyGroups' in h5file else set()
-            for i, galaxyGroup in enumerate(self.listGalaxyGroups):
-                if f'GalaxyGroup_{i}' in existing_groups:
-                    print(f"GalaxyGroup_{i} already exists in file. Skipping.")
-                    continue
-        
-        else:
-            for key, value in self.headerInformation.items():
-                h5file.attrs[key] = value
-            
-            grp = h5file.create_group('GalaxyGroups')
-            for i, galaxyGroup in enumerate(self.listGalaxyGroups):
-                print(f"Progress: {i+1}/{len(self.listGalaxyGroups)}", end='\r')
-                gg_grp : h5.Group = grp.create_group(f'GalaxyGroup_{i}')
-                gg_grp.attrs['group_id'] = galaxyGroup.getGroupID()
-                gg_grp.attrs['MCrit200'] = galaxyGroup.getMCrit200()
-                gg_grp.attrs['posCM'] = galaxyGroup.getPosCM()
-                gg_grp.attrs['pos'] = galaxyGroup.getPos()
-                
-                subhalos_grp : h5.Group = gg_grp.create_group('Subhalos')
-                for j, subhalo in enumerate(galaxyGroup.getSubhalos()):
-                    subhalo : Subhalo = subhalo
-                    sh_grp = subhalos_grp.create_group(f'Subhalo_{j}')
-                    sh_grp.attrs['idx'] = subhalo.getIdx()
-                    sh_grp.attrs['flag'] = subhalo.getFlag()
-                    sh_grp.attrs['mass'] = subhalo.getMass()
-                    sh_grp.attrs['stellarMass'] = subhalo.getStellarMass()
-                    sh_grp.attrs['groupNumber'] = subhalo.getGroupNumber()
-                    sh_grp.attrs['position'] = subhalo.getPosition()
-                    sh_grp.attrs['halfMassRad'] = subhalo.getHalfMassRad()
-                    sh_grp.attrs['vmaxRadius'] = subhalo.getVmaxRadius()
-                    sh_grp.attrs['luminosities'] = subhalo.getLuminosities()
-                    
-    def load_from_hdf5(self, h5file : h5.File):
-        self.listGalaxyGroups = []
-        self.headerInformation = {}
-        for key, value in h5file.attrs.items():
-            self.headerInformation[key] = value
-        grp = h5file['GalaxyGroups']
-        for i, gg_key in enumerate(grp):
-            print(f"Progress: {i+1}/{len(grp)}", end='\r')
-            gg_grp : h5.Group = grp[gg_key]
-            group_id = gg_grp.attrs['group_id']
-            MCrit200 = gg_grp.attrs['MCrit200']
-            posCM = gg_grp.attrs['posCM']
-            pos = gg_grp.attrs['pos']
-            galaxyGroup = GalaxyGroup(group_id, MCrit200, posCM, pos)
-            
-            subhalos_grp : h5.Group = gg_grp['Subhalos']
-            for sh_key in subhalos_grp:
-                sh_grp : h5.Group = subhalos_grp[sh_key]
-                idx = sh_grp.attrs['idx']
-                flag = sh_grp.attrs['flag']
-                mass = sh_grp.attrs['mass']
-                stellarMass = sh_grp.attrs['stellarMass']
-                groupNumber = sh_grp.attrs['groupNumber']
-                position = sh_grp.attrs['position']
-                halfMassRad = sh_grp.attrs['halfMassRad']
-                vmaxRadius = sh_grp.attrs['vmaxRadius']
-                luminosities = sh_grp.attrs['luminosities']
-                
-                subhalo = Subhalo(idx, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities)
-                galaxyGroup.addSubhalo(subhalo)
-            
-            self.listGalaxyGroups.append(galaxyGroup)
-            
-            
+    def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
+        return self.list_pairwise_differences
             
     def compute_all_pairwise_polar_differences(self) -> list[list[tuple[float, float, float]]]:
         '''
@@ -147,9 +118,6 @@ class ListGalaxyGroup:
 
             self.list_pairwise_differences.append(group_pairwise_differences)
             
-        return self.list_pairwise_differences
-    
-    def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
     
     def compute_probablity_distribution_of_polar_differences(self, bin_size : float=5.0) -> tuple[np.ndarray, np.ndarray]:
@@ -239,6 +207,166 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
         
+    def filterSubhalos(self, minStellarMass : float=None, maxStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000) -> None:
+        '''
+        Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
+        - remove non cosmlogoical in origin (subhaloflag = 0)
+        - only mass greater than 13 solar mass
+        - remove groups where no single central (i.e. central pos does not match cm pos)
+        - Later on will need to filter based on radius due to smoothing length: because the smoothing length used by the TNG300 is different for z < 1 and z >= 1 we'll likely want to adopt a minimum  size for the galaxies we want to use following Curtis et al. (2026) (note: we need to check to see if TNGCluster used the same smoothing length change as TNG300)
+        
+        :param minStellarMass: Minimum stellar mass to retain a subhalo (default is None)
+        :param maxStellarMass: Maximum stellar mass to retain a subhalo (default is None)
+        :param minHalfMassRad_kpc: Minimum half-mass radius in kpc to retain a subhalo (default is None)
+        :param maxHalfMassRad_kpc: Maximum half-mass radius in kpc to retain a subhalo (default is None)
+        :param centralPosTolerance_kpc: Maximum distance from central position in kpc to retain a subhalo (default is 1000 kpc, i.e. 1 Mpc)
+        '''
+        list_filtered_galaxy_groups : list[GalaxyGroup]= []
+        for galaxyGroup in self.listGalaxyGroups:
+            print(f"Progress: Filtering Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            filtered_subhalos : list[Subhalo] = []
+            central_pos = galaxyGroup.getPos()
+            galaxyGroupCM = galaxyGroup.getPosCM()
+            
+            distance = np.linalg.norm(central_pos - galaxyGroupCM)
+            if distance > centralPosTolerance_kpc:
+                print(f"Skipping Galaxy Group ID {galaxyGroup.getGroupID()} due to central position mismatch (distance: {distance} kpc)")
+                continue
+            
+            for subhalo in galaxyGroup.getSubhalos():
+                if subhalo.getFlag() == 0:
+                    continue
+                if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+                    continue
+                if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+                    continue
+                if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
+                    continue
+                if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
+                    continue
+                filtered_subhalos.append(subhalo)
+                
+            filtered_galaxyGroup = GalaxyGroup(galaxyGroup.getGroupID(), galaxyGroup.getMCrit200(), galaxyGroup.getPosCM(), galaxyGroup.getPos(), filtered_subhalos)
+            if len(filtered_subhalos) > 0:
+                list_filtered_galaxy_groups.append(filtered_galaxyGroup)
+                
+        self.listGalaxyGroups = list_filtered_galaxy_groups
+                        
+    def correctPositions(self, boxsize : float):
+        '''
+        Corrects the positions of subhalos in each galaxy group to account for periodic boundary conditions. 
+        Ensure all positions are relative to the central galaxy.
+        
+        :param boxsize: Size of the simulation box
+        '''
+        for galaxyGroup in self.listGalaxyGroups:
+            print(f"Progress: Correcting Positions for Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            central_pos = galaxyGroup.getPos()
+            galaxyGroupCM = galaxyGroup.getPosCM()
+            
+            corrected_galaxyGroupCM = np.zeros(3)
+            for dim in range(3):
+                delta = galaxyGroupCM[dim] - central_pos[dim]
+                if delta > boxsize / 2:
+                    corrected_coord = galaxyGroupCM[dim] - boxsize
+                elif delta < -boxsize / 2:
+                    corrected_coord = galaxyGroupCM[dim] + boxsize
+                else:
+                    corrected_coord = galaxyGroupCM[dim]
+                corrected_galaxyGroupCM[dim] = corrected_coord
+            galaxyGroup.setPosCM(corrected_galaxyGroupCM)
+            
+            corrected_central_pos = np.zeros(3)
+            galaxyGroup.setPos(corrected_central_pos)
+            
+            
+            
+            for subhalo in galaxyGroup.getSubhalos():
+                position = subhalo.getPosition()
+                corrected_position = np.zeros(3)
+                for dim in range(3):
+                    delta = position[dim] - central_pos[dim]
+                    if delta > boxsize / 2:
+                        corrected_coord = position[dim] - boxsize
+                    elif delta < -boxsize / 2:
+                        corrected_coord = position[dim] + boxsize
+                    else:
+                        corrected_coord = position[dim]
+                    corrected_position[dim] = corrected_coord
+                subhalo.setPosition(corrected_position)
         
         
+    
+    def save_to_hdf5(self, h5file : h5.File, overwrite : bool=True):
+        
+        if not overwrite:
+            #check which groups already exist
+            existing_groups = set(h5file['GalaxyGroups'].keys()) if 'GalaxyGroups' in h5file else set()
+            for i, galaxyGroup in enumerate(self.listGalaxyGroups):
+                if f'GalaxyGroup_{i}' in existing_groups:
+                    print(f"GalaxyGroup_{i} already exists in file. Skipping.")
+                    continue
+        
+        else:
+            for key, value in self.headerInformation.items():
+                h5file.attrs[key] = value
+            
+            grp = h5file.create_group('GalaxyGroups')
+            for i, galaxyGroup in enumerate(self.listGalaxyGroups):
+                print(f"Progress: {i+1}/{len(self.listGalaxyGroups)}", end='\r')
+                gg_grp : h5.Group = grp.create_group(f'GalaxyGroup_{i}')
+                gg_grp.attrs['group_id'] = galaxyGroup.getGroupID()
+                gg_grp.attrs['MCrit200'] = galaxyGroup.getMCrit200()
+                gg_grp.attrs['posCM'] = galaxyGroup.getPosCM()
+                gg_grp.attrs['pos'] = galaxyGroup.getPos()
+                
+                subhalos_grp : h5.Group = gg_grp.create_group('Subhalos')
+                for j, subhalo in enumerate(galaxyGroup.getSubhalos()):
+                    subhalo : Subhalo = subhalo
+                    sh_grp = subhalos_grp.create_group(f'Subhalo_{j}')
+                    sh_grp.attrs['idx'] = subhalo.getIdx()
+                    sh_grp.attrs['flag'] = subhalo.getFlag()
+                    sh_grp.attrs['mass'] = subhalo.getMass()
+                    sh_grp.attrs['stellarMass'] = subhalo.getStellarMass()
+                    sh_grp.attrs['groupNumber'] = subhalo.getGroupNumber()
+                    sh_grp.attrs['position'] = subhalo.getPosition()
+                    sh_grp.attrs['halfMassRad'] = subhalo.getHalfMassRad()
+                    sh_grp.attrs['vmaxRadius'] = subhalo.getVmaxRadius()
+                    sh_grp.attrs['luminosities'] = subhalo.getLuminosities()
+                    
+    def load_from_hdf5(self, h5file : h5.File):
+        self.listGalaxyGroups = []
+        self.headerInformation = {}
+        for key, value in h5file.attrs.items():
+            self.headerInformation[key] = value
+        grp = h5file['GalaxyGroups']
+        for i, gg_key in enumerate(grp):
+            print(f"Progress: {i+1}/{len(grp)}", end='\r')
+            gg_grp : h5.Group = grp[gg_key]
+            group_id = gg_grp.attrs['group_id']
+            MCrit200 = gg_grp.attrs['MCrit200']
+            posCM = gg_grp.attrs['posCM']
+            pos = gg_grp.attrs['pos']
+            galaxyGroup = GalaxyGroup(group_id, MCrit200, posCM, pos)
+            
+            subhalos_grp : h5.Group = gg_grp['Subhalos']
+            for sh_key in subhalos_grp:
+                sh_grp : h5.Group = subhalos_grp[sh_key]
+                idx = sh_grp.attrs['idx']
+                flag = sh_grp.attrs['flag']
+                mass = sh_grp.attrs['mass']
+                stellarMass = sh_grp.attrs['stellarMass']
+                groupNumber = sh_grp.attrs['groupNumber']
+                position = sh_grp.attrs['position']
+                halfMassRad = sh_grp.attrs['halfMassRad']
+                vmaxRadius = sh_grp.attrs['vmaxRadius']
+                luminosities = sh_grp.attrs['luminosities']
+                
+                subhalo = Subhalo(idx, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities)
+                galaxyGroup.addSubhalo(subhalo)
+            
+            self.listGalaxyGroups.append(galaxyGroup)
+            
+            
+            
         

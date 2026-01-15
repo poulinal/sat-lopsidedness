@@ -1,6 +1,7 @@
 # ADP 2026
 
 from myproject.utilities.Subhalo import Subhalo
+import numpy as np
 
 class GalaxyGroup:
     def __init__(self, group_id, MCrit200, posCM, pos, listSubhalos : list[Subhalo]=[]):
@@ -9,7 +10,7 @@ class GalaxyGroup:
         self.posCM = posCM
         self.pos = pos
     
-        self.listSubhalos = []
+        self.listSubhalos = listSubhalos
         
     def addSubhalo(self, subhalo : Subhalo):
         self.listSubhalos.append(subhalo)
@@ -17,7 +18,7 @@ class GalaxyGroup:
     def getNumSubhalos(self):
         return len(self.listSubhalos)
     
-    def getSubhalos(self):
+    def getSubhalos(self) -> list[Subhalo]:
         return self.listSubhalos
     
     def getGroupID(self):
@@ -34,6 +35,14 @@ class GalaxyGroup:
     
     def getSubhaloI(self, i):
         return self.listSubhalos[i]
+    
+    def setPosCM(self, newPosCM : np.ndarray):
+        self.posCM = newPosCM
+        
+    def setPos(self, newPos : np.ndarray):
+        self.pos = newPos
+        
+    
     
     
     
