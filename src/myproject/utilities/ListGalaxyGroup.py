@@ -51,6 +51,8 @@ class ListGalaxyGroup:
         self.headerInformation = headerInformation
         self.list_pairwise_differences : list[list[float]] = []
         self.MRL_values : list[float] = []
+
+        self.lenGalaxyGroups = len(self.listGalaxyGroups)
         
     @classmethod
     def from_hdf5(cls, h5file : h5.File):
@@ -60,9 +62,13 @@ class ListGalaxyGroup:
         
     def addGalaxyGroup(self, galaxyGroup : GalaxyGroup):
         self.listGalaxyGroups.append(galaxyGroup)
+        self.lenGalaxyGroups += 1
         
     def getNumGalaxyGroups(self):
-        return len(self.listGalaxyGroups)
+        return self.lenGalaxyGroups
+    
+    def getGalaxyGroupI(self, i):
+        return self.listGalaxyGroups[i]
     
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
@@ -223,7 +229,7 @@ class ListGalaxyGroup:
         '''
         list_filtered_galaxy_groups : list[GalaxyGroup]= []
         for galaxyGroup in self.listGalaxyGroups:
-            print(f"Progress: Filtering Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            # print(f"Progress: Filtering Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
             filtered_subhalos : list[Subhalo] = []
             central_pos = galaxyGroup.getPos()
             galaxyGroupCM = galaxyGroup.getPosCM()
@@ -233,7 +239,8 @@ class ListGalaxyGroup:
                 print(f"Skipping Galaxy Group ID {galaxyGroup.getGroupID()} due to central position mismatch (distance: {distance} kpc)")
                 continue
             
-            for subhalo in galaxyGroup.getSubhalos():
+            for i, subhalo in enumerate(galaxyGroup.getSubhalos()):
+                print(f"Progress: Filtering Subhalo {i} / {galaxyGroup.getNumSubhalos()} of galaxy:  {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 if subhalo.getFlag() == 0:
                     continue
                 if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
@@ -260,7 +267,7 @@ class ListGalaxyGroup:
         :param boxsize: Size of the simulation box
         '''
         for galaxyGroup in self.listGalaxyGroups:
-            print(f"Progress: Correcting Positions for Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            # print(f"Progress: Correcting Positions for Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
             central_pos = galaxyGroup.getPos()
             galaxyGroupCM = galaxyGroup.getPosCM()
             
@@ -282,6 +289,7 @@ class ListGalaxyGroup:
             
             
             for subhalo in galaxyGroup.getSubhalos():
+                print(f"Progress: Correcting Subhalo {i} / {galaxyGroup.getNumSubhalos()} of galaxy:  {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 position = subhalo.getPosition()
                 corrected_position = np.zeros(3)
                 for dim in range(3):

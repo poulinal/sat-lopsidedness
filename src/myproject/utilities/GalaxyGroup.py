@@ -11,12 +11,15 @@ class GalaxyGroup:
         self.pos = pos
     
         self.listSubhalos = listSubhalos
+        # print(f"self.listSubhalos: {len(self.listSubhalos)}")
+        self.lenSubhalos = len(self.listSubhalos)
         
     def addSubhalo(self, subhalo : Subhalo):
         self.listSubhalos.append(subhalo)
+        self.lenSubhalos += 1
         
     def getNumSubhalos(self):
-        return len(self.listSubhalos)
+        return self.lenSubhalos
     
     def getSubhalos(self) -> list[Subhalo]:
         return self.listSubhalos
