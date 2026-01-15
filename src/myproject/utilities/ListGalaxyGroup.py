@@ -287,7 +287,7 @@ class ListGalaxyGroup:
                                 centralPosTolerance_kpc: float = 1000, n_processes: Optional[int] = None) -> None:
         '''
         Parallel version of filterSubhalos using multiprocessing.
-        Significantly faster for large datasets.
+        Significantly faster for large datasets. Shows incremental progress.
         
         Parameters
         ----------
@@ -308,6 +308,7 @@ class ListGalaxyGroup:
             n_processes = get_optimal_processes(len(self.listGalaxyGroups))
         
         print(f"Filtering subhalos in parallel with {n_processes} processes...")
+        total = len(self.listGalaxyGroups)
         
         # Prepare arguments for parallel processing
         args_list = [
@@ -315,8 +316,15 @@ class ListGalaxyGroup:
             for gg in self.listGalaxyGroups
         ]
         
-        from .parallelTools import parallel_starmap
-        results = parallel_starmap(_filter_subhalos_for_group, args_list, n_processes=n_processes, show_progress=True)
+        # Use imap_unordered to get results as they complete (allows progress tracking)
+        import multiprocessing as mp
+        with mp.Pool(processes=n_processes) as pool:
+            results = []
+            for i, result in enumerate(pool.istarmap(_filter_subhalos_for_group, args_list), 1):
+                results.append(result)
+                percent = (i / total) * 100
+                print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+            print()  # New line after progress
         
         # Filter out None results (skipped groups)
         self.listGalaxyGroups = [gg for gg in results if gg is not None]
