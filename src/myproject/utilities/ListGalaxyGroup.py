@@ -2,8 +2,10 @@
 
 from myproject.utilities.Subhalo import Subhalo
 from .GalaxyGroup import GalaxyGroup
+from .parallelTools import parallel_map, get_optimal_processes
 import h5py as h5
 import numpy as np
+from typing import Optional
 
 class ListGalaxyGroup:
     """
@@ -126,6 +128,34 @@ class ListGalaxyGroup:
             
         return self.list_pairwise_differences
     
+    def compute_all_pairwise_polar_differences_parallel(self, n_processes: Optional[int] = None) -> list[list[tuple[float, float, float]]]:
+        '''
+        Parallel version of compute_all_pairwise_polar_differences using multiprocessing.
+        Significantly faster for large datasets.
+        
+        Parameters
+        ----------
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+            
+        Returns
+        -------
+        list[list[tuple[float, float, float]]]
+            List of pairwise polar angle differences for each galaxy group
+        '''
+        if n_processes is None:
+            n_processes = get_optimal_processes(len(self.listGalaxyGroups))
+        
+        print(f"Computing pairwise differences in parallel with {n_processes} processes...")
+        self.list_pairwise_differences = parallel_map(
+            _compute_pairwise_for_group,
+            self.listGalaxyGroups,
+            n_processes=n_processes,
+            show_progress=True
+        )
+        
+        return self.list_pairwise_differences
+    
     def compute_probablity_distribution_of_polar_differences(self, bin_size : float=5.0) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_polar_differences
@@ -145,6 +175,45 @@ class ListGalaxyGroup:
         hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
+    
+    def compute_all_MRL_directionality_parallel(self, n_processes: Optional[int] = None) -> list[float]:
+        '''
+        Parallel version of compute_all_MRL_directionality using multiprocessing.
+        Significantly faster for large datasets.
+        
+        Parameters
+        ----------
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+            
+        Returns
+        -------
+        list[float]
+            MRL directionality values for each galaxy group (3 values per group: XY, YZ, ZX)
+        '''
+        if not self.list_pairwise_differences:
+            print("Computing pairwise differences first (in parallel)...")
+            self.compute_all_pairwise_polar_differences_parallel(n_processes=n_processes)
+        else:
+            print("Using pre-computed pairwise polar differences.")
+        
+        if n_processes is None:
+            n_processes = get_optimal_processes(len(self.list_pairwise_differences))
+        
+        print(f"Computing MRL directionality in parallel with {n_processes} processes...")
+        results = parallel_map(
+            _compute_MRL_for_group,
+            self.list_pairwise_differences,
+            n_processes=n_processes,
+            show_progress=True
+        )
+        
+        # Flatten results (each result is [R_xy, R_yz, R_zx])
+        self.MRL_values = []
+        for mrl_vals in results:
+            self.MRL_values.extend(mrl_vals)
+        
+        return self.MRL_values
     
     def compute_all_MRL_directionality(self) -> list[float]:
         '''
@@ -212,6 +281,48 @@ class ListGalaxyGroup:
         hist, bin_edges = np.histogram(self.MRL_values, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
+    
+    def filterSubhalos_parallel(self, minStellarMass: float = None, maxStellarMass: float = None, 
+                                minHalfMassRad_kpc: float = None, maxHalfMassRad_kpc: float = None, 
+                                centralPosTolerance_kpc: float = 1000, n_processes: Optional[int] = None) -> None:
+        '''
+        Parallel version of filterSubhalos using multiprocessing.
+        Significantly faster for large datasets.
+        
+        Parameters
+        ----------
+        minStellarMass : float, optional
+            Minimum stellar mass to retain a subhalo
+        maxStellarMass : float, optional
+            Maximum stellar mass to retain a subhalo
+        minHalfMassRad_kpc : float, optional
+            Minimum half-mass radius in kpc to retain a subhalo
+        maxHalfMassRad_kpc : float, optional
+            Maximum half-mass radius in kpc to retain a subhalo
+        centralPosTolerance_kpc : float
+            Maximum distance from central position in kpc to retain a subhalo (default: 1000 kpc)
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+        '''
+        if n_processes is None:
+            n_processes = get_optimal_processes(len(self.listGalaxyGroups))
+        
+        print(f"Filtering subhalos in parallel with {n_processes} processes...")
+        
+        # Prepare arguments for parallel processing
+        args_list = [
+            (gg, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc)
+            for gg in self.listGalaxyGroups
+        ]
+        
+        from .parallelTools import parallel_starmap
+        results = parallel_starmap(_filter_subhalos_for_group, args_list, n_processes=n_processes, show_progress=True)
+        
+        # Filter out None results (skipped groups)
+        self.listGalaxyGroups = [gg for gg in results if gg is not None]
+        self.lenGalaxyGroups = len(self.listGalaxyGroups)
+        
+        print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         
     def filterSubhalos(self, minStellarMass : float=None, maxStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000) -> None:
         '''
@@ -258,6 +369,32 @@ class ListGalaxyGroup:
                 list_filtered_galaxy_groups.append(filtered_galaxyGroup)
                 
         self.listGalaxyGroups = list_filtered_galaxy_groups
+    
+    def correctPositions_parallel(self, boxsize: float, n_processes: Optional[int] = None) -> None:
+        '''
+        Parallel version of correctPositions using multiprocessing.
+        Significantly faster for large datasets.
+        
+        Parameters
+        ----------
+        boxsize : float
+            Size of the simulation box
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+        '''
+        if n_processes is None:
+            n_processes = get_optimal_processes(len(self.listGalaxyGroups))
+        
+        print(f"Correcting positions in parallel with {n_processes} processes...")
+        
+        # Prepare arguments for parallel processing
+        args_list = [(gg, boxsize) for gg in self.listGalaxyGroups]
+        
+        from .parallelTools import parallel_starmap
+        self.listGalaxyGroups = parallel_starmap(_correct_positions_for_group, args_list, 
+                                                  n_processes=n_processes, show_progress=True)
+        
+        print("Position corrections completed.")
                         
     def correctPositions(self, boxsize : float):
         '''
@@ -341,6 +478,77 @@ class ListGalaxyGroup:
                     sh_grp.attrs['halfMassRad'] = subhalo.getHalfMassRad()
                     sh_grp.attrs['vmaxRadius'] = subhalo.getVmaxRadius()
                     sh_grp.attrs['luminosities'] = subhalo.getLuminosities()
+    
+    def save_to_hdf5_parallel(self, h5file: h5.File, overwrite: bool = True, n_processes: Optional[int] = None):
+        '''
+        Parallel version of save_to_hdf5 using multiprocessing.
+        Serializes galaxy group data in parallel, then writes sequentially.
+        Most useful when you have many galaxy groups with complex data.
+        
+        Note: The actual HDF5 writing is still sequential (HDF5 limitation),
+        but data preparation is parallelized.
+        
+        Parameters
+        ----------
+        h5file : h5.File
+            HDF5 file handle to write to
+        overwrite : bool
+            If True, create new groups; if False, skip existing groups
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+        '''
+        if not overwrite:
+            # Serial processing for append mode
+            existing_groups = set(h5file['GalaxyGroups'].keys()) if 'GalaxyGroups' in h5file else set()
+            for i, galaxyGroup in enumerate(self.listGalaxyGroups):
+                if f'GalaxyGroup_{i}' in existing_groups:
+                    print(f"GalaxyGroup_{i} already exists in file. Skipping.")
+                    continue
+        else:
+            # Write header information
+            for key, value in self.headerInformation.items():
+                h5file.attrs[key] = value
+            
+            if n_processes is None:
+                n_processes = get_optimal_processes(len(self.listGalaxyGroups))
+            
+            print(f"Serializing galaxy group data in parallel with {n_processes} processes...")
+            
+            # Prepare arguments for parallel processing
+            args_list = [(gg, i) for i, gg in enumerate(self.listGalaxyGroups)]
+            
+            from .parallelTools import parallel_starmap
+            serialized_data = parallel_starmap(_serialize_galaxy_group, args_list, 
+                                              n_processes=n_processes, show_progress=True)
+            
+            print("Writing serialized data to HDF5 file...")
+            grp = h5file.create_group('GalaxyGroups')
+            
+            for group_data in serialized_data:
+                i = group_data['index']
+                if i % max(1, len(serialized_data) // 100) == 0:
+                    print(f"\rWriting: {i+1}/{len(serialized_data)}", end='', flush=True)
+                
+                gg_grp = grp.create_group(f'GalaxyGroup_{i}')
+                gg_grp.attrs['group_id'] = group_data['group_id']
+                gg_grp.attrs['MCrit200'] = group_data['MCrit200']
+                gg_grp.attrs['posCM'] = group_data['posCM']
+                gg_grp.attrs['pos'] = group_data['pos']
+                
+                subhalos_grp = gg_grp.create_group('Subhalos')
+                for j, subhalo_data in enumerate(group_data['subhalos']):
+                    sh_grp = subhalos_grp.create_group(f'Subhalo_{j}')
+                    sh_grp.attrs['idx'] = subhalo_data['idx']
+                    sh_grp.attrs['flag'] = subhalo_data['flag']
+                    sh_grp.attrs['mass'] = subhalo_data['mass']
+                    sh_grp.attrs['stellarMass'] = subhalo_data['stellarMass']
+                    sh_grp.attrs['groupNumber'] = subhalo_data['groupNumber']
+                    sh_grp.attrs['position'] = subhalo_data['position']
+                    sh_grp.attrs['halfMassRad'] = subhalo_data['halfMassRad']
+                    sh_grp.attrs['vmaxRadius'] = subhalo_data['vmaxRadius']
+                    sh_grp.attrs['luminosities'] = subhalo_data['luminosities']
+            
+            print(f"\nCompleted writing {len(serialized_data)} galaxy groups to HDF5.")
                     
     def load_from_hdf5(self, h5file : h5.File):
         self.listGalaxyGroups = []
@@ -374,7 +582,203 @@ class ListGalaxyGroup:
                 galaxyGroup.addSubhalo(subhalo)
             
             self.listGalaxyGroups.append(galaxyGroup)
+
+
+# Standalone functions for multiprocessing (must be picklable)
+def _compute_pairwise_for_group(galaxyGroup):
+    """Helper function to compute pairwise differences for a single galaxy group."""
+    from myproject.utilities.Subhalo import Subhalo
+    import numpy as np
+    
+    subhalos = galaxyGroup.getSubhalos()
+    num_subhalos = len(subhalos)
+    central_pos = galaxyGroup.getPos()
+    group_pairwise_differences = []
+    
+    for i in range(num_subhalos):
+        for j in range(i + 1, num_subhalos):
+            pos_i = subhalos[i].getPosition()
+            pos_j = subhalos[j].getPosition()
             
+            # XY plane
+            vec_i_xy = np.array([pos_i[0] - central_pos[0], pos_i[1] - central_pos[1]])
+            vec_j_xy = np.array([pos_j[0] - central_pos[0], pos_j[1] - central_pos[1]])
+            angle_i_xy = np.arctan2(vec_i_xy[1], vec_i_xy[0])
+            angle_j_xy = np.arctan2(vec_j_xy[1], vec_j_xy[0])
+            diff_xy = np.abs(angle_i_xy - angle_j_xy) * (180.0 / np.pi)
+            diff_xy = diff_xy if diff_xy <= 180 else 360 - diff_xy
             
+            # YZ plane
+            vec_i_yz = np.array([pos_i[1] - central_pos[1], pos_i[2] - central_pos[2]])
+            vec_j_yz = np.array([pos_j[1] - central_pos[1], pos_j[2] - central_pos[2]])
+            angle_i_yz = np.arctan2(vec_i_yz[1], vec_i_yz[0])
+            angle_j_yz = np.arctan2(vec_j_yz[1], vec_j_yz[0])
+            diff_yz = np.abs(angle_i_yz - angle_j_yz) * (180.0 / np.pi)
+            diff_yz = diff_yz if diff_yz <= 180 else 360 - diff_yz
             
+            # ZX plane
+            vec_i_zx = np.array([pos_i[2] - central_pos[2], pos_i[0] - central_pos[0]])
+            vec_j_zx = np.array([pos_j[2] - central_pos[2], pos_j[0] - central_pos[0]])
+            angle_i_zx = np.arctan2(vec_i_zx[1], vec_i_zx[0])
+            angle_j_zx = np.arctan2(vec_j_zx[1], vec_j_zx[0])
+            diff_zx = np.abs(angle_i_zx - angle_j_zx) * (180.0 / np.pi)
+            diff_zx = diff_zx if diff_zx <= 180 else 360 - diff_zx
+            
+            pairwise_difference = (diff_xy, diff_yz, diff_zx)
+            group_pairwise_differences.append(pairwise_difference)
+    
+    return group_pairwise_differences
+
+
+def _compute_MRL_for_group(pairwise_group):
+    """Helper function to compute MRL for a single galaxy group's pairwise differences."""
+    import numpy as np
+    
+    n = len(pairwise_group)
+    if n == 0:
+        return [0.0, 0.0, 0.0]
+    
+    list_diff_xy = []
+    list_diff_yz = []
+    list_diff_zx = []
+    
+    for pairwise_difference in pairwise_group:
+        diff_xy, diff_yz, diff_zx = pairwise_difference
+        list_diff_xy.append(diff_xy)
+        list_diff_yz.append(diff_yz)
+        list_diff_zx.append(diff_zx)
+    
+    # Compute MRL for XY plane
+    cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_xy])
+    sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_xy])
+    R_xy = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+    
+    # Compute MRL for YZ plane
+    cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_yz])
+    sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_yz])
+    R_yz = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+    
+    # Compute MRL for ZX plane
+    cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_zx])
+    sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_zx])
+    R_zx = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+    
+    return [R_xy, R_yz, R_zx]
+
+
+def _filter_subhalos_for_group(args):
+    """Helper function to filter subhalos for a single galaxy group."""
+    from myproject.utilities.Subhalo import Subhalo
+    from myproject.utilities.GalaxyGroup import GalaxyGroup
+    import numpy as np
+    
+    galaxyGroup, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc = args
+    
+    central_pos = galaxyGroup.getPos()
+    galaxyGroupCM = galaxyGroup.getPosCM()
+    
+    distance = np.linalg.norm(central_pos - galaxyGroupCM)
+    if distance > centralPosTolerance_kpc:
+        return None  # Signal to skip this group
+    
+    filtered_subhalos = []
+    for subhalo in galaxyGroup.getSubhalos():
+        if subhalo.getFlag() == 0:
+            continue
+        if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+            continue
+        if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+            continue
+        if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
+            continue
+        if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
+            continue
+        filtered_subhalos.append(subhalo)
+    
+    if len(filtered_subhalos) == 0:
+        return None
+    
+    filtered_galaxyGroup = GalaxyGroup(
+        galaxyGroup.getGroupID(), 
+        galaxyGroup.getMCrit200(), 
+        galaxyGroup.getPosCM(), 
+        galaxyGroup.getPos(), 
+        filtered_subhalos
+    )
+    return filtered_galaxyGroup
+
+
+def _correct_positions_for_group(args):
+    """Helper function to correct positions for a single galaxy group."""
+    from myproject.utilities.Subhalo import Subhalo
+    import numpy as np
+    
+    galaxyGroup, boxsize = args
+    
+    central_pos = galaxyGroup.getPos()
+    galaxyGroupCM = galaxyGroup.getPosCM()
+    
+    # Correct group CM position
+    corrected_galaxyGroupCM = np.zeros(3)
+    for dim in range(3):
+        delta = galaxyGroupCM[dim] - central_pos[dim]
+        if delta > boxsize / 2:
+            corrected_coord = galaxyGroupCM[dim] - boxsize
+        elif delta < -boxsize / 2:
+            corrected_coord = galaxyGroupCM[dim] + boxsize
+        else:
+            corrected_coord = galaxyGroupCM[dim]
+        corrected_galaxyGroupCM[dim] = corrected_coord
+    galaxyGroup.setPosCM(corrected_galaxyGroupCM)
+    
+    # Set central position to origin
+    corrected_central_pos = np.zeros(3)
+    galaxyGroup.setPos(corrected_central_pos)
+    
+    # Correct all subhalo positions
+    for subhalo in galaxyGroup.getSubhalos():
+        position = subhalo.getPosition()
+        corrected_position = np.zeros(3)
+        for dim in range(3):
+            delta = position[dim] - central_pos[dim]
+            if delta > boxsize / 2:
+                corrected_coord = position[dim] - boxsize
+            elif delta < -boxsize / 2:
+                corrected_coord = position[dim] + boxsize
+            else:
+                corrected_coord = position[dim]
+            corrected_position[dim] = corrected_coord
+        subhalo.setPosition(corrected_position)
+    
+    return galaxyGroup
+
+
+def _serialize_galaxy_group(args):
+    """Helper function to serialize a galaxy group's data for HDF5 writing."""
+    galaxyGroup, i = args
+    
+    group_data = {
+        'index': i,
+        'group_id': galaxyGroup.getGroupID(),
+        'MCrit200': galaxyGroup.getMCrit200(),
+        'posCM': galaxyGroup.getPosCM(),
+        'pos': galaxyGroup.getPos(),
+        'subhalos': []
+    }
+    
+    for j, subhalo in enumerate(galaxyGroup.getSubhalos()):
+        subhalo_data = {
+            'idx': subhalo.getIdx(),
+            'flag': subhalo.getFlag(),
+            'mass': subhalo.getMass(),
+            'stellarMass': subhalo.getStellarMass(),
+            'groupNumber': subhalo.getGroupNumber(),
+            'position': subhalo.getPosition(),
+            'halfMassRad': subhalo.getHalfMassRad(),
+            'vmaxRadius': subhalo.getVmaxRadius(),
+            'luminosities': subhalo.getLuminosities()
+        }
+        group_data['subhalos'].append(subhalo_data)
+    
+    return group_data
         
