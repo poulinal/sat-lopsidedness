@@ -282,7 +282,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
     
-    def filterSubhalos_parallel(self, minStellarMass: float = None, maxStellarMass: float = None, 
+    def filterSubhalos_parallel(self, minGGMass: float = None, maxGGMass: float = None, minSatStellarMass: float = None, maxSatStellarMass: float = None, 
                                 minHalfMassRad_kpc: float = None, maxHalfMassRad_kpc: float = None, 
                                 centralPosTolerance_kpc: float = 1000, n_processes: Optional[int] = None) -> None:
         '''
@@ -312,7 +312,7 @@ class ListGalaxyGroup:
         
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc)
             for gg in self.listGalaxyGroups
         ]
         
@@ -333,7 +333,7 @@ class ListGalaxyGroup:
         
         print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         
-    def filterAndCorrectSubhalos_parallel(self, minStellarMass: float = None, maxStellarMass: float = None, 
+    def filterAndCorrectSubhalos_parallel(self, minGGMass: float = None, maxGGMass: float = None, minSatStellarMass: float = None, maxSatStellarMass: float = None, 
                                 minHalfMassRad_kpc: float = None, maxHalfMassRad_kpc: float = None, 
                                 centralPosTolerance_kpc: float = 1000, boxsize : float = None, n_processes: Optional[int] = None) -> None:
         '''
@@ -363,7 +363,7 @@ class ListGalaxyGroup:
         
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize)
             for gg in self.listGalaxyGroups
         ]
         
@@ -384,7 +384,7 @@ class ListGalaxyGroup:
         
         print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         
-    def filterSubhalos(self, minStellarMass : float=None, maxStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000) -> None:
+    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000) -> None:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -392,8 +392,8 @@ class ListGalaxyGroup:
         - remove groups where no single central (i.e. central pos does not match cm pos)
         - Later on will need to filter based on radius due to smoothing length: because the smoothing length used by the TNG300 is different for z < 1 and z >= 1 we'll likely want to adopt a minimum  size for the galaxies we want to use following Curtis et al. (2026) (note: we need to check to see if TNGCluster used the same smoothing length change as TNG300)
         
-        :param minStellarMass: Minimum stellar mass to retain a subhalo (default is None)
-        :param maxStellarMass: Maximum stellar mass to retain a subhalo (default is None)
+        :param minSatStellarMass: Minimum stellar mass to retain a subhalo (default is None)
+        :param maxSatStellarMass: Maximum stellar mass to retain a subhalo (default is None)
         :param minHalfMassRad_kpc: Minimum half-mass radius in kpc to retain a subhalo (default is None)
         :param maxHalfMassRad_kpc: Maximum half-mass radius in kpc to retain a subhalo (default is None)
         :param centralPosTolerance_kpc: Maximum distance from central position in kpc to retain a subhalo (default is 1000 kpc, i.e. 1 Mpc)
@@ -402,6 +402,14 @@ class ListGalaxyGroup:
         for galaxyGroup in self.listGalaxyGroups:
             # print(f"Progress: Filtering Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
             filtered_subhalos : list[Subhalo] = []
+            galaxyGroupMass = galaxyGroup.getMCrit200()
+            if minGGMass is not None and galaxyGroupMass < minGGMass:
+                print(f"Skipping Galaxy Group ID {galaxyGroup.getGroupID()} due to low mass ({galaxyGroupMass} < {minGGMass})")
+                continue
+            if maxGGMass is not None and galaxyGroupMass > maxGGMass:
+                print(f"Skipping Galaxy Group ID {galaxyGroup.getGroupID()} due to high mass ({galaxyGroupMass} > {maxGGMass})")
+                continue
+            
             central_pos = galaxyGroup.getPos()
             galaxyGroupCM = galaxyGroup.getPosCM()
             
@@ -414,9 +422,9 @@ class ListGalaxyGroup:
                 print(f"Progress: Filtering Subhalo {i} / {galaxyGroup.getNumSubhalos()} of galaxy:  {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 if subhalo.getFlag() == 0:
                     continue
-                if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+                if minSatStellarMass is not None and subhalo.getStellarMass() < minSatStellarMass:
                     continue
-                if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+                if maxSatStellarMass is not None and subhalo.getStellarMass() > maxSatStellarMass:
                     continue
                 if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
                     continue
@@ -748,7 +756,12 @@ def _filter_subhalos_for_group(args):
     from myproject.utilities.GalaxyGroup import GalaxyGroup
     import numpy as np
     
-    galaxyGroup, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc = args
+    galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc = args
+    
+    if minGGMass is not None and galaxyGroup.getMCrit200() < minGGMass:
+        return None
+    if maxGGMass is not None and galaxyGroup.getMCrit200() > maxGGMass:
+        return None
     
     central_pos = galaxyGroup.getPos()
     galaxyGroupCM = galaxyGroup.getPosCM()
@@ -761,9 +774,9 @@ def _filter_subhalos_for_group(args):
     for subhalo in galaxyGroup.getSubhalos():
         if subhalo.getFlag() == 0:
             continue
-        if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+        if minSatStellarMass is not None and subhalo.getStellarMass() < minSatStellarMass:
             continue
-        if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+        if maxSatStellarMass is not None and subhalo.getStellarMass() > maxSatStellarMass:
             continue
         if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
             continue
@@ -790,7 +803,12 @@ def _filter_and_correct_subhalos_for_group(args):
     from myproject.utilities.GalaxyGroup import GalaxyGroup
     import numpy as np
     
-    galaxyGroup, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize = args
+    galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize = args
+    
+    if minGGMass is not None and galaxyGroup.getMCrit200() < minGGMass:
+        return None
+    if maxGGMass is not None and galaxyGroup.getMCrit200() > maxGGMass:
+        return None
     
     central_pos = galaxyGroup.getPos()
     galaxyGroupCM = galaxyGroup.getPosCM()
@@ -820,9 +838,9 @@ def _filter_and_correct_subhalos_for_group(args):
     for subhalo in galaxyGroup.getSubhalos():
         if subhalo.getFlag() == 0:
             continue
-        if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+        if minSatStellarMass is not None and subhalo.getStellarMass() < minSatStellarMass:
             continue
-        if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+        if maxSatStellarMass is not None and subhalo.getStellarMass() > maxSatStellarMass:
             continue
         if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
             continue
