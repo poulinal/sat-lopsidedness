@@ -155,6 +155,7 @@ class AstroPlotter:
                     vmin: Optional[float] = None,
                     vmax: Optional[float] = None,
                     colorbar: bool = True,
+                    output_filename: Optional[str] = None,
                     **kwargs) -> Tuple[Figure, Axes]:
         """
         Create a scatter plot.
@@ -226,6 +227,9 @@ class AstroPlotter:
             if clabel:
                 cbar.set_label(clabel)
         
+        if output_filename:
+            self.save_figure(fig, output_filename)
+            
         return fig, ax
     
     def line_plot(self, x: np.ndarray, y: np.ndarray,
