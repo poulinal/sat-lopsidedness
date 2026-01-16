@@ -316,11 +316,63 @@ class ListGalaxyGroup:
             for gg in self.listGalaxyGroups
         ]
         
-        # Use imap_unordered to get results as they complete (allows progress tracking)
+        # Use imap to get results as they complete (allows progress tracking)
+        # imap doesn't unpack tuples, unlike istarmap
         import multiprocessing as mp
         with mp.Pool(processes=n_processes) as pool:
             results = []
-            for i, result in enumerate(pool.istarmap(_filter_subhalos_for_group, args_list), 1):
+            for i, result in enumerate(pool.imap(_filter_subhalos_for_group, args_list), 1):
+                results.append(result)
+                percent = (i / total) * 100
+                print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+            print()  # New line after progress
+        
+        # Filter out None results (skipped groups)
+        self.listGalaxyGroups = [gg for gg in results if gg is not None]
+        self.lenGalaxyGroups = len(self.listGalaxyGroups)
+        
+        print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
+        
+    def filterAndCorrectSubhalos_parallel(self, minStellarMass: float = None, maxStellarMass: float = None, 
+                                minHalfMassRad_kpc: float = None, maxHalfMassRad_kpc: float = None, 
+                                centralPosTolerance_kpc: float = 1000, boxsize : float = None, n_processes: Optional[int] = None) -> None:
+        '''
+        Parallel version of filterSubhalos using multiprocessing.
+        Significantly faster for large datasets. Shows incremental progress.
+        
+        Parameters
+        ----------
+        minStellarMass : float, optional
+            Minimum stellar mass to retain a subhalo
+        maxStellarMass : float, optional
+            Maximum stellar mass to retain a subhalo
+        minHalfMassRad_kpc : float, optional
+            Minimum half-mass radius in kpc to retain a subhalo
+        maxHalfMassRad_kpc : float, optional
+            Maximum half-mass radius in kpc to retain a subhalo
+        centralPosTolerance_kpc : float
+            Maximum distance from central position in kpc to retain a subhalo (default: 1000 kpc)
+        n_processes : int, optional
+            Number of processes to use (default: CPU count - 1)
+        '''
+        if n_processes is None:
+            n_processes = get_optimal_processes(len(self.listGalaxyGroups))
+        
+        print(f"Filtering subhalos in parallel with {n_processes} processes...")
+        total = len(self.listGalaxyGroups)
+        
+        # Prepare arguments for parallel processing
+        args_list = [
+            (gg, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize)
+            for gg in self.listGalaxyGroups
+        ]
+        
+        # Use imap to get results as they complete (allows progress tracking)
+        # imap doesn't unpack tuples, unlike istarmap
+        import multiprocessing as mp
+        with mp.Pool(processes=n_processes) as pool:
+            results = []
+            for i, result in enumerate(pool.imap(_filter_and_correct_subhalos_for_group, args_list), 1):
                 results.append(result)
                 percent = (i / total) * 100
                 print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -394,14 +446,22 @@ class ListGalaxyGroup:
             n_processes = get_optimal_processes(len(self.listGalaxyGroups))
         
         print(f"Correcting positions in parallel with {n_processes} processes...")
+        total = len(self.listGalaxyGroups)
         
         # Prepare arguments for parallel processing
         args_list = [(gg, boxsize) for gg in self.listGalaxyGroups]
         
-        from .parallelTools import parallel_starmap
-        self.listGalaxyGroups = parallel_starmap(_correct_positions_for_group, args_list, 
-                                                  n_processes=n_processes, show_progress=True)
+        # Use imap to get results as they complete (allows progress tracking)
+        import multiprocessing as mp
+        with mp.Pool(processes=n_processes) as pool:
+            results = []
+            for i, result in enumerate(pool.imap(_correct_positions_for_group, args_list), 1):
+                results.append(result)
+                percent = (i / total) * 100
+                print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+            print()  # New line after progress
         
+        self.listGalaxyGroups = results
         print("Position corrections completed.")
                         
     def correctPositions(self, boxsize : float):
@@ -433,7 +493,7 @@ class ListGalaxyGroup:
             
             
             
-            for subhalo in galaxyGroup.getSubhalos():
+            for i, subhalo in enumerate(galaxyGroup.getSubhalos()):
                 print(f"Progress: Correcting Subhalo {i} / {galaxyGroup.getNumSubhalos()} of galaxy:  {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 position = subhalo.getPosition()
                 corrected_position = np.zeros(3)
@@ -521,21 +581,29 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(len(self.listGalaxyGroups))
             
             print(f"Serializing galaxy group data in parallel with {n_processes} processes...")
+            total = len(self.listGalaxyGroups)
             
             # Prepare arguments for parallel processing
             args_list = [(gg, i) for i, gg in enumerate(self.listGalaxyGroups)]
             
-            from .parallelTools import parallel_starmap
-            serialized_data = parallel_starmap(_serialize_galaxy_group, args_list, 
-                                              n_processes=n_processes, show_progress=True)
+            # Use imap to get results as they complete (allows progress tracking)
+            import multiprocessing as mp
+            with mp.Pool(processes=n_processes) as pool:
+                serialized_data = []
+                for i, result in enumerate(pool.imap(_serialize_galaxy_group, args_list), 1):
+                    serialized_data.append(result)
+                    percent = (i / total) * 100
+                    print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                print()  # New line after progress
             
             print("Writing serialized data to HDF5 file...")
             grp = h5file.create_group('GalaxyGroups')
+            total = len(serialized_data)
             
-            for group_data in serialized_data:
+            for idx, group_data in enumerate(serialized_data, 1):
                 i = group_data['index']
-                if i % max(1, len(serialized_data) // 100) == 0:
-                    print(f"\rWriting: {i+1}/{len(serialized_data)}", end='', flush=True)
+                percent = (idx / total) * 100
+                print(f"\rWriting: {idx}/{total} ({percent:.1f}%)", end='', flush=True)
                 
                 gg_grp = grp.create_group(f'GalaxyGroup_{i}')
                 gg_grp.attrs['group_id'] = group_data['group_id']
@@ -701,6 +769,79 @@ def _filter_subhalos_for_group(args):
             continue
         if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
             continue
+        filtered_subhalos.append(subhalo)
+    
+    if len(filtered_subhalos) == 0:
+        return None
+    
+    filtered_galaxyGroup = GalaxyGroup(
+        galaxyGroup.getGroupID(), 
+        galaxyGroup.getMCrit200(), 
+        galaxyGroup.getPosCM(), 
+        galaxyGroup.getPos(), 
+        filtered_subhalos
+    )
+    return filtered_galaxyGroup
+
+
+def _filter_and_correct_subhalos_for_group(args):
+    """Helper function to filter subhalos for a single galaxy group."""
+    from myproject.utilities.Subhalo import Subhalo
+    from myproject.utilities.GalaxyGroup import GalaxyGroup
+    import numpy as np
+    
+    galaxyGroup, minStellarMass, maxStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, boxsize = args
+    
+    central_pos = galaxyGroup.getPos()
+    galaxyGroupCM = galaxyGroup.getPosCM()
+    
+    distance = np.linalg.norm(central_pos - galaxyGroupCM)
+    if distance > centralPosTolerance_kpc:
+        return None  # Signal to skip this group
+    
+    # Correct group CM position
+    corrected_galaxyGroupCM = np.zeros(3)
+    for dim in range(3):
+        delta = galaxyGroupCM[dim] - central_pos[dim]
+        if delta > boxsize / 2:
+            corrected_coord = galaxyGroupCM[dim] - boxsize
+        elif delta < -boxsize / 2:
+            corrected_coord = galaxyGroupCM[dim] + boxsize
+        else:
+            corrected_coord = galaxyGroupCM[dim]
+        corrected_galaxyGroupCM[dim] = corrected_coord
+    galaxyGroup.setPosCM(corrected_galaxyGroupCM)
+    
+    # Set central position to origin
+    corrected_central_pos = np.zeros(3)
+    galaxyGroup.setPos(corrected_central_pos)
+    
+    filtered_subhalos = []
+    for subhalo in galaxyGroup.getSubhalos():
+        if subhalo.getFlag() == 0:
+            continue
+        if minStellarMass is not None and subhalo.getStellarMass() < minStellarMass:
+            continue
+        if maxStellarMass is not None and subhalo.getStellarMass() > maxStellarMass:
+            continue
+        if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
+            continue
+        if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
+            continue
+        
+        position = subhalo.getPosition()
+        corrected_position = np.zeros(3)
+        for dim in range(3):
+            delta = position[dim] - central_pos[dim]
+            if delta > boxsize / 2:
+                corrected_coord = position[dim] - boxsize
+            elif delta < -boxsize / 2:
+                corrected_coord = position[dim] + boxsize
+            else:
+                corrected_coord = position[dim]
+            corrected_position[dim] = corrected_coord
+        subhalo.setPosition(corrected_position)
+        
         filtered_subhalos.append(subhalo)
     
     if len(filtered_subhalos) == 0:
