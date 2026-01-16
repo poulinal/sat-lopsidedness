@@ -4,8 +4,9 @@ from myproject.utilities.Subhalo import Subhalo
 import numpy as np
 
 class GalaxyGroup:
-    def __init__(self, group_id, MCrit200, posCM, pos, listSubhalos : list[Subhalo]=[]):
+    def __init__(self, group_id, RCrit200, MCrit200, posCM, pos, listSubhalos : list[Subhalo]=[]):
         self.group_id = group_id
+        self.RCrit200 = RCrit200
         self.MCrit200 = MCrit200
         self.posCM = posCM
         self.pos = pos
@@ -27,6 +28,9 @@ class GalaxyGroup:
     def getGroupID(self):
         return self.group_id
     
+    def getRCrit200(self):
+        return self.RCrit200
+    
     def getMCrit200(self):
         return self.MCrit200
     
@@ -45,7 +49,8 @@ class GalaxyGroup:
     def setPos(self, newPos : np.ndarray):
         self.pos = newPos
         
-    
+    def setRCrit200(self, newRCrit200 : float):
+        self.RCrit200 = newRCrit200
     
     
     

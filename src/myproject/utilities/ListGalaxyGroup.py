@@ -95,6 +95,8 @@ class ListGalaxyGroup:
         :rtype: list[list[float]]
         '''
         self.list_pairwise_differences = []
+        print(f"Total Galaxy Groups to process: {len(self.listGalaxyGroups)} with pairs : {sum([gg.getNumSubhalos() * (gg.getNumSubhalos() - 1) // 2 for gg in self.listGalaxyGroups])}")
+        
         if parallelize:
             if n_processes is None:
                 n_processes = get_optimal_processes(len(self.listGalaxyGroups))
@@ -230,7 +232,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
         
-    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
+    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -243,6 +245,9 @@ class ListGalaxyGroup:
         :param minHalfMassRad_kpc: Minimum half-mass radius in kpc to retain a subhalo (default is None)
         :param maxHalfMassRad_kpc: Maximum half-mass radius in kpc to retain a subhalo (default is None)
         :param centralPosTolerance_kpc: Maximum distance from central position in kpc to retain a subhalo (default is 1000 kpc, i.e. 1 Mpc)
+        :param M_r_min: Minimum r-band magnitude to retain a subhalo (default is None)
+        :param M_r_max: Maximum r-band magnitude to retain a subhalo (default is None)
+        :param satWithinR200: Whether to retain only satellites within R200 (default is False)
         :param parallelize: Whether to parallelize the filtering process (default is False)
         :param n_processes: Number of processes to use if parallelizing (default is None, which uses optimal number)
         '''
@@ -251,7 +256,7 @@ class ListGalaxyGroup:
             
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200)
             for gg in self.listGalaxyGroups
         ]
         
@@ -537,13 +542,13 @@ class ListGalaxyGroup:
         return [R_xy, R_yz, R_zx]
 
     @staticmethod
-    def _filter_subhalos_for_group(args):
+    def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float, bool]):
         """Helper function to filter subhalos for a single galaxy group."""
         from myproject.utilities.Subhalo import Subhalo
         from myproject.utilities.GalaxyGroup import GalaxyGroup
         import numpy as np
         
-        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc = args
+        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200 = args
         
         if minGGMass is not None and galaxyGroup.getMCrit200() < minGGMass:
             return None
@@ -569,13 +574,21 @@ class ListGalaxyGroup:
                 continue
             if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
                 continue
-            filtered_subhalos.append(subhalo)
+            if M_r_min is not None and subhalo.getRbandMagnitude() < M_r_min:
+                continue
+            if M_r_max is not None and subhalo.getRbandMagnitude() > M_r_max:
+                continue
+            if satWithinR200:
+                distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
+                if distance_to_central > galaxyGroup.getRCrit200():
+                    continue
         
         if len(filtered_subhalos) == 0:
             return None
         
         filtered_galaxyGroup = GalaxyGroup(
             galaxyGroup.getGroupID(), 
+            galaxyGroup.getRCrit200(),
             galaxyGroup.getMCrit200(), 
             galaxyGroup.getPosCM(), 
             galaxyGroup.getPos(), 
