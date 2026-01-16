@@ -100,12 +100,15 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(len(self.listGalaxyGroups))
         
             print(f"Computing pairwise differences in parallel with {n_processes} processes...")
-            self.list_pairwise_differences = parallel_map(
-                ListGalaxyGroup._compute_pairwise_for_group,
-                self.listGalaxyGroups,
-                n_processes=n_processes,
-                show_progress=True
-            )
+            total = len(self.listGalaxyGroups)
+            
+            import multiprocessing as mp
+            with mp.Pool(processes=n_processes) as pool:
+                for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_pairwise_for_group, self.listGalaxyGroups), 1):
+                    self.list_pairwise_differences.append(result)
+                    percent = (i / total) * 100
+                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                print()  # New line after progress
         else:
             for galaxyGroup in self.listGalaxyGroups:
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
@@ -159,13 +162,20 @@ class ListGalaxyGroup:
             print("Using pre-computed pairwise polar differences.")
             
         if parallelize:
+            if n_processes is None:
+                n_processes = get_optimal_processes(len(self.list_pairwise_differences))
+            
             print(f"Computing MRL directionality in parallel with {n_processes} processes...")
-            results = parallel_map(
-                ListGalaxyGroup._compute_MRL_for_group,
-                self.list_pairwise_differences,
-                n_processes=n_processes,
-                show_progress=True
-            )
+            total = len(self.list_pairwise_differences)
+            
+            import multiprocessing as mp
+            with mp.Pool(processes=n_processes) as pool:
+                results = []
+                for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_MRL_for_group, self.list_pairwise_differences), 1):
+                    results.append(result)
+                    percent = (i / total) * 100
+                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                print()  # New line after progress
             
             # Flatten results (each result is [R_xy, R_yz, R_zx])
             self.MRL_values = []
