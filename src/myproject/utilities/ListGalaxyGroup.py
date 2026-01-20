@@ -61,6 +61,9 @@ class ListGalaxyGroup:
         instance = cls()
         instance.load_from_hdf5(h5file)
         return instance
+
+    def getHeaderInformation(self):
+        return self.headerInformation
         
     def addGalaxyGroup(self, galaxyGroup : GalaxyGroup):
         self.listGalaxyGroups.append(galaxyGroup)
@@ -78,6 +81,10 @@ class ListGalaxyGroup:
     
     def getGalaxyGroupI(self, i):
         return self.listGalaxyGroups[i]
+
+    def getAverageNumSubhalosPerGalaxyGroup(self) -> float:
+        total_subhalos = sum(gg.getNumSubhalos() for gg in self.listGalaxyGroups)
+        return total_subhalos / self.lenGalaxyGroups if self.lenGalaxyGroups > 0 else 0.0
     
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
@@ -278,7 +285,8 @@ class ListGalaxyGroup:
                 print()  # New line after progress
             
             # Filter out None results (skipped groups)
-            self.setGalaxyGroups([gg for gg in results if gg is not None])
+            # self.setGalaxyGroups([gg for gg in results if gg is not None])
+            list_filtered_galaxy_groups = [gg for gg in results if gg is not None]
             
             print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         else:
@@ -287,10 +295,12 @@ class ListGalaxyGroup:
                 print(f"Progress: Processing Galaxy Group ID {args[0].getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 list_filtered_galaxy_groups.append(ListGalaxyGroup._filter_subhalos_for_group(args))
                     
-            self.setGalaxyGroups([gg for gg in list_filtered_galaxy_groups if gg is not None])
+            # self.setGalaxyGroups([gg for gg in list_filtered_galaxy_groups if gg is not None])
             
-        return self.getAllGalaxyGroups()
+        # return self.getAllGalaxyGroups()
+        return list_filtered_galaxy_groups
                         
+
     def correctPositions(self, boxsize : float, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
         Corrects the positions of subhalos in each galaxy group to account for periodic boundary conditions. 
@@ -319,16 +329,15 @@ class ListGalaxyGroup:
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
-            self.setGalaxyGroups(results)
         else:
             results = []
             for args in args_list:
                 print(f"Progress: Processing Galaxy Group ID {args[0].getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 results.append(ListGalaxyGroup._correct_positions_for_group(args))
                 
-            self.setGalaxyGroups(results)
-        
-        return self.getAllGalaxyGroups()
+        # self.setGalaxyGroups(results)
+        # return self.getAllGalaxyGroups()
+        return results
        
        
        
@@ -403,6 +412,7 @@ class ListGalaxyGroup:
                 
                 gg_grp = grp.create_group(f'GalaxyGroup_{i}')
                 gg_grp.attrs['group_id'] = group_data['group_id']
+                gg_grp.attrs['RCrit200'] = group_data['RCrit200']
                 gg_grp.attrs['MCrit200'] = group_data['MCrit200']
                 gg_grp.attrs['posCM'] = group_data['posCM']
                 gg_grp.attrs['pos'] = group_data['pos']
@@ -433,10 +443,11 @@ class ListGalaxyGroup:
             print(f"Progress: {i+1}/{len(grp)}", end='\r')
             gg_grp : h5.Group = grp[gg_key]
             galaxy_group_id = gg_grp.attrs['group_id']
+            RCrit200 = gg_grp.attrs['RCrit200']
             MCrit200 = gg_grp.attrs['MCrit200']
             posCM = gg_grp.attrs['posCM']
             pos = gg_grp.attrs['pos']
-            galaxyGroup = GalaxyGroup(galaxy_group_id, MCrit200, posCM, pos)
+            galaxyGroup = GalaxyGroup(galaxy_group_id, RCrit200, MCrit200, posCM, pos, listSubhalos=[])
             
             subhalos_grp : h5.Group = gg_grp['Subhalos']
             for sh_key in subhalos_grp:
@@ -462,45 +473,81 @@ class ListGalaxyGroup:
     # Standalone functions for multiprocessing (must be picklable)
     @staticmethod
     def _compute_pairwise_for_group(galaxyGroup):
-        """Helper function to compute pairwise differences for a single galaxy group."""
-        from myproject.utilities.Subhalo import Subhalo
+        """Helper function to compute pairwise differences for a single galaxy group.
+        
+        Memory-efficient streaming approach: computes angles upfront (minimal memory),
+        then iterates through pairs without storing full N×N matrices.
+        """
         import numpy as np
         
         subhalos = galaxyGroup.getSubhalos()
         num_subhalos = len(subhalos)
+        if num_subhalos < 2:
+            return []
+
         central_pos = galaxyGroup.getPos()
+        # group_pairwise_differences = []
+        
+        # for i in range(num_subhalos):
+        #     print(f"    Processing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()}", end='\r')
+        #     for j in range(i + 1, num_subhalos):
+        #         pos_i = subhalos[i].getPosition()
+        #         pos_j = subhalos[j].getPosition()
+                
+        #         # XY plane
+        #         vec_i_xy = np.array([pos_i[0] - central_pos[0], pos_i[1] - central_pos[1]])
+        #         vec_j_xy = np.array([pos_j[0] - central_pos[0], pos_j[1] - central_pos[1]])
+        #         angle_i_xy = np.arctan2(vec_i_xy[1], vec_i_xy[0])
+        #         angle_j_xy = np.arctan2(vec_j_xy[1], vec_j_xy[0])
+        #         diff_xy = np.abs(angle_i_xy - angle_j_xy) * (180.0 / np.pi)
+        #         diff_xy = diff_xy if diff_xy <= 180 else 360 - diff_xy
+                
+        #         # YZ plane
+        #         vec_i_yz = np.array([pos_i[1] - central_pos[1], pos_i[2] - central_pos[2]])
+        #         vec_j_yz = np.array([pos_j[1] - central_pos[1], pos_j[2] - central_pos[2]])
+        #         angle_i_yz = np.arctan2(vec_i_yz[1], vec_i_yz[0])
+        #         angle_j_yz = np.arctan2(vec_j_yz[1], vec_j_yz[0])
+        #         diff_yz = np.abs(angle_i_yz - angle_j_yz) * (180.0 / np.pi)
+        #         diff_yz = diff_yz if diff_yz <= 180 else 360 - diff_yz
+                
+        #         # ZX plane
+        #         vec_i_zx = np.array([pos_i[2] - central_pos[2], pos_i[0] - central_pos[0]])
+        #         vec_j_zx = np.array([pos_j[2] - central_pos[2], pos_j[0] - central_pos[0]])
+        #         angle_i_zx = np.arctan2(vec_i_zx[1], vec_i_zx[0])
+        #         angle_j_zx = np.arctan2(vec_j_zx[1], vec_j_zx[0])
+        #         diff_zx = np.abs(angle_i_zx - angle_j_zx) * (180.0 / np.pi)
+        #         diff_zx = diff_zx if diff_zx <= 180 else 360 - diff_zx
+                
+        #         pairwise_difference = (diff_xy, diff_yz, diff_zx)
+        #         group_pairwise_differences.append(pairwise_difference)
+        
+        # Vectorize angle computation (minimal memory footprint)
+        positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
+        rel_pos = positions - central_pos
+
+        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
+        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
+        angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+
+        # Stream-compute pairwise differences without allocating full matrices
         group_pairwise_differences = []
+        deg = 180.0 / np.pi
         
         for i in range(num_subhalos):
+            print(f"    Processing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}")
             for j in range(i + 1, num_subhalos):
-                pos_i = subhalos[i].getPosition()
-                pos_j = subhalos[j].getPosition()
+                # Compute angle differences for each plane (in radians, then convert)
+                diff_xy = np.abs(angles_xy[i] - angles_xy[j])
+                diff_xy = min(diff_xy, 2 * np.pi - diff_xy)  # Shortest arc
                 
-                # XY plane
-                vec_i_xy = np.array([pos_i[0] - central_pos[0], pos_i[1] - central_pos[1]])
-                vec_j_xy = np.array([pos_j[0] - central_pos[0], pos_j[1] - central_pos[1]])
-                angle_i_xy = np.arctan2(vec_i_xy[1], vec_i_xy[0])
-                angle_j_xy = np.arctan2(vec_j_xy[1], vec_j_xy[0])
-                diff_xy = np.abs(angle_i_xy - angle_j_xy) * (180.0 / np.pi)
-                diff_xy = diff_xy if diff_xy <= 180 else 360 - diff_xy
+                diff_yz = np.abs(angles_yz[i] - angles_yz[j])
+                diff_yz = min(diff_yz, 2 * np.pi - diff_yz)
                 
-                # YZ plane
-                vec_i_yz = np.array([pos_i[1] - central_pos[1], pos_i[2] - central_pos[2]])
-                vec_j_yz = np.array([pos_j[1] - central_pos[1], pos_j[2] - central_pos[2]])
-                angle_i_yz = np.arctan2(vec_i_yz[1], vec_i_yz[0])
-                angle_j_yz = np.arctan2(vec_j_yz[1], vec_j_yz[0])
-                diff_yz = np.abs(angle_i_yz - angle_j_yz) * (180.0 / np.pi)
-                diff_yz = diff_yz if diff_yz <= 180 else 360 - diff_yz
+                diff_zx = np.abs(angles_zx[i] - angles_zx[j])
+                diff_zx = min(diff_zx, 2 * np.pi - diff_zx)
                 
-                # ZX plane
-                vec_i_zx = np.array([pos_i[2] - central_pos[2], pos_i[0] - central_pos[0]])
-                vec_j_zx = np.array([pos_j[2] - central_pos[2], pos_j[0] - central_pos[0]])
-                angle_i_zx = np.arctan2(vec_i_zx[1], vec_i_zx[0])
-                angle_j_zx = np.arctan2(vec_j_zx[1], vec_j_zx[0])
-                diff_zx = np.abs(angle_i_zx - angle_j_zx) * (180.0 / np.pi)
-                diff_zx = diff_zx if diff_zx <= 180 else 360 - diff_zx
-                
-                pairwise_difference = (diff_xy, diff_yz, diff_zx)
+                # Convert to degrees
+                pairwise_difference = (diff_xy * deg, diff_yz * deg, diff_zx * deg)
                 group_pairwise_differences.append(pairwise_difference)
         
         return group_pairwise_differences
@@ -580,6 +627,7 @@ class ListGalaxyGroup:
                 continue
             if satWithinR200:
                 distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
+                print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
                 if distance_to_central > galaxyGroup.getRCrit200():
                     continue
         
@@ -649,6 +697,7 @@ class ListGalaxyGroup:
         group_data = {
             'index': i,
             'group_id': galaxyGroup.getGroupID(),
+            'RCrit200': galaxyGroup.getRCrit200(),
             'MCrit200': galaxyGroup.getMCrit200(),
             'posCM': galaxyGroup.getPosCM(),
             'pos': galaxyGroup.getPos(),
