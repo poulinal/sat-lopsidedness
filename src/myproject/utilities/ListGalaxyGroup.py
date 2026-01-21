@@ -5,6 +5,8 @@ from .GalaxyGroup import GalaxyGroup
 from .parallelTools import parallel_map, get_optimal_processes
 import h5py as h5
 import numpy as np
+import os
+import pickle
 from typing import Optional
 
 class ListGalaxyGroup:
@@ -89,7 +91,7 @@ class ListGalaxyGroup:
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
             
-    def compute_all_pairwise_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None) -> list[list[tuple[float, float, float]]]:
+    def compute_all_pairwise_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None, tempSaveDir : str=None) -> list[list[tuple[float, float, float]]]:
         '''
         Docstring for compute_all_pairwise_polar_differences
         Computes all pairwise polar angle differences (in each plane: XY, YZ, ZX) between satellite galaxies in each galaxy group with resepect to the host galaxy.
@@ -119,16 +121,49 @@ class ListGalaxyGroup:
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
         else:
-            for galaxyGroup in self.listGalaxyGroups:
+            if tempSaveDir is not None:
+                os.makedirs(tempSaveDir, exist_ok=True)
+                batch_list_pairwise_differences = []
+                
+            for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
 
-                self.list_pairwise_differences.append(group_pairwise_differences)
+                if tempSaveDir is not None:
+                    batch_list_pairwise_differences.append(group_pairwise_differences)
+                else:
+                    self.list_pairwise_differences.append(group_pairwise_differences)
+                
+                #temp save after every 100 groups
+                if i % 100 == 0 and tempSaveDir is not None:
+                    print(f"\nIntermediate save after processing {i} galaxy groups.")
+                    temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{i}.pkl")
+                    with open(temp_save_path, 'wb') as f:
+                        pickle.dump(batch_list_pairwise_differences, f)
+                    batch_list_pairwise_differences = []
+                        
+            # Final save after all groups processed
+            if tempSaveDir is not None:
+                print(f"\nFinal save after processing all galaxy groups.")
+                temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_final.pkl")
+                with open(temp_save_path, 'wb') as f:
+                    pickle.dump(batch_list_pairwise_differences, f)
+                    batch_list_pairwise_differences = []
+                    
+            # accumulate results based on all saved batches
+            if tempSaveDir is not None:
+                self.list_pairwise_differences = []
+                for filename in os.listdir(tempSaveDir):
+                    if filename.startswith("pairwise_differences_") and filename.endswith(".pkl"):
+                        file_path = os.path.join(tempSaveDir, filename)
+                        with open(file_path, 'rb') as f:
+                            batch_data = pickle.load(f)
+                            self.list_pairwise_differences.extend(batch_data)
             
         return self.list_pairwise_differences
     
-    def compute_probablity_distribution_of_polar_differences(self, bin_size : float=5.0, parallelize: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_polar_differences(self, bin_size : float=5.0, parallelize: bool = False, tempSaveDir : str=None) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_polar_differences
         Computes the probability distribution of polar angle differences between satellite galaxies in each galaxy group with resepect to the host galaxy.
@@ -140,7 +175,7 @@ class ListGalaxyGroup:
         :rtype: tuple[np.ndarray, np.ndarray]
         '''
         if not self.list_pairwise_differences:
-            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None)
+            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir)
         pairwise_differences_flatten = []
         for galaxyPairwiseGroup in self.list_pairwise_differences:
             for pair in galaxyPairwiseGroup:
