@@ -125,7 +125,18 @@ class ListGalaxyGroup:
                 os.makedirs(tempSaveDir, exist_ok=True)
                 batch_list_pairwise_differences = []
                 
+                #check existing temp files to resume
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".pkl")]
+                if existing_files:
+                    #get the index of each file
+                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
+                    last_file = existing_files[-1]
+                    print(f"Resuming from existing temp file: {last_file}")
+                    start_index = int(last_file.split('_')[2].split('.')[0])
+                
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
+                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                    continue  # Skip already processed groups
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
@@ -185,7 +196,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
     
-    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None) -> list[float]:
+    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
         Computes the Mean Resultant Length (MRL) directionality for each galaxy group.
@@ -201,7 +212,7 @@ class ListGalaxyGroup:
         '''
         self.MRL_values = []
         if not self.list_pairwise_differences:
-            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=n_processes)
+            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir)
         else:
             print("Using pre-computed pairwise polar differences.")
             
@@ -226,7 +237,21 @@ class ListGalaxyGroup:
             for mrl_vals in results:
                 self.MRL_values.extend(mrl_vals)
         else:
-            for galaxyPairwiseGroup in self.getListPairwiseDifferences():
+            if tempSaveDir is not None:
+                os.makedirs(tempSaveDir, exist_ok=True)
+                batch_MRL_values = []
+                #check existing temp files to resume
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("MRL_values_") and f.endswith(".pkl")]
+                if existing_files:
+                    #get the index of each file
+                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
+                    last_file = existing_files[-1]
+                    print(f"Resuming from existing temp file: {last_file}")
+                    start_index = int(last_file.split('_')[2].split('.')[0])
+            
+            for i, galaxyPairwiseGroup in enumerate(self.getListPairwiseDifferences(), 1):
+                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                    continue  # Skip already processed groups
                 n = len(galaxyPairwiseGroup)
                 list_diff_xy = []
                 list_diff_yz = []
@@ -250,8 +275,37 @@ class ListGalaxyGroup:
                 cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_zx])
                 sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_zx])
                 R_zx = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2) if n > 0 else 0.0
+                
                 # Don't take average, append all three values
-                self.MRL_values.extend([R_xy, R_yz, R_zx])
+                if tempSaveDir is not None:
+                    batch_MRL_values.extend([R_xy, R_yz, R_zx])
+                else:
+                    self.MRL_values.extend([R_xy, R_yz, R_zx])
+                    
+                #temp save after every 100 groups
+                if tempSaveDir is not None and i % 100 == 0:
+                    print(f"\nIntermediate save after processing {i} galaxy groups.")
+                    temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{i}.pkl")
+                    with open(temp_save_path, 'wb') as f:
+                        pickle.dump(batch_MRL_values, f)
+                    batch_MRL_values = []
+            # Final save after all groups processed
+            if tempSaveDir is not None:
+                print(f"\nFinal save after processing all galaxy groups.")
+                temp_save_path = os.path.join(tempSaveDir, f"MRL_values_final.pkl")
+                with open(temp_save_path, 'wb') as f:
+                    pickle.dump(batch_MRL_values, f)
+                    batch_MRL_values = []
+            # accumulate results based on all saved batches
+            if tempSaveDir is not None:
+                self.MRL_values = []
+                for filename in os.listdir(tempSaveDir):
+                    if filename.startswith("MRL_values_") and filename.endswith(".pkl"):
+                        file_path = os.path.join(tempSaveDir, filename)
+                        with open(file_path, 'rb') as f:
+                            batch_data = pickle.load(f)
+                            self.MRL_values.extend(batch_data)
+            
         return self.MRL_values
             
     def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05) -> tuple[np.ndarray, np.ndarray]:
