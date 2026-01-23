@@ -134,7 +134,18 @@ class ListGalaxyGroup:
                     print(f"Resuming from existing temp file: {last_file}")
                     start_index = int(last_file.split('_')[2].split('.')[0])
                 
+                #check existing temp files to resume
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".pkl")]
+                if existing_files:
+                    #get the index of each file
+                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
+                    last_file = existing_files[-1]
+                    print(f"Resuming from existing temp file: {last_file}")
+                    start_index = int(last_file.split('_')[2].split('.')[0])
+                
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
+                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                    continue  # Skip already processed groups
                 if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
                     continue  # Skip already processed groups
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
@@ -197,6 +208,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
     
+    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
     def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
