@@ -154,6 +154,8 @@ class AstroPlotter:
                     s: float = 20,
                     vmin: Optional[float] = None,
                     vmax: Optional[float] = None,
+                    xlim: Optional[Tuple[float, float]] = None,
+                    ylim: Optional[Tuple[float, float]] = None,
                     colorbar: bool = True,
                     output_filename: Optional[str] = None,
                     **kwargs) -> Tuple[Figure, Axes]:
@@ -213,6 +215,12 @@ class AstroPlotter:
         if ylog:
             ax.set_yscale('log')
         
+        # Set limits
+        if xlim:
+            ax.set_xlim(xlim)
+        if ylim:
+            ax.set_ylim(ylim)
+            
         # Labels and title
         if xlabel:
             ax.set_xlabel(xlabel)

@@ -125,7 +125,18 @@ class ListGalaxyGroup:
                 os.makedirs(tempSaveDir, exist_ok=True)
                 batch_list_pairwise_differences = []
                 
+                #check existing temp files to resume
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".pkl")]
+                if existing_files:
+                    #get the index of each file
+                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
+                    last_file = existing_files[-1]
+                    print(f"Resuming from existing temp file: {last_file}")
+                    start_index = int(last_file.split('_')[2].split('.')[0])
+                
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
+                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                    continue  # Skip already processed groups
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
@@ -146,13 +157,14 @@ class ListGalaxyGroup:
             # Final save after all groups processed
             if tempSaveDir is not None:
                 print(f"\nFinal save after processing all galaxy groups.")
-                temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_final.pkl")
+                temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{self.getNumGalaxyGroups()}.pkl")
                 with open(temp_save_path, 'wb') as f:
                     pickle.dump(batch_list_pairwise_differences, f)
                     batch_list_pairwise_differences = []
                     
             # accumulate results based on all saved batches
             if tempSaveDir is not None:
+                print("Accumulating results from saved batches...")
                 self.list_pairwise_differences = []
                 for filename in os.listdir(tempSaveDir):
                     if filename.startswith("pairwise_differences_") and filename.endswith(".pkl"):
@@ -185,7 +197,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
     
-    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None) -> list[float]:
+    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
         Computes the Mean Resultant Length (MRL) directionality for each galaxy group.
@@ -200,22 +212,18 @@ class ListGalaxyGroup:
         :rtype: list[float]
         '''
         self.MRL_values = []
-        if not self.list_pairwise_differences:
-            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=n_processes)
-        else:
-            print("Using pre-computed pairwise polar differences.")
             
         if parallelize:
             if n_processes is None:
-                n_processes = get_optimal_processes(len(self.list_pairwise_differences))
+                n_processes = get_optimal_processes(len(self.listGalaxyGroups))
             
             print(f"Computing MRL directionality in parallel with {n_processes} processes...")
-            total = len(self.list_pairwise_differences)
+            total = len(self.listGalaxyGroups)
             
             import multiprocessing as mp
             with mp.Pool(processes=n_processes) as pool:
                 results = []
-                for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_MRL_for_group, self.list_pairwise_differences), 1):
+                for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_MRL_for_group, self.listGalaxyGroups), 1):
                     results.append(result)
                     percent = (i / total) * 100
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -226,35 +234,58 @@ class ListGalaxyGroup:
             for mrl_vals in results:
                 self.MRL_values.extend(mrl_vals)
         else:
-            for galaxyPairwiseGroup in self.getListPairwiseDifferences():
-                n = len(galaxyPairwiseGroup)
-                list_diff_xy = []
-                list_diff_yz = []
-                list_diff_zx = []
-                
-                for pairwise_difference in galaxyPairwiseGroup:
-                    diff_xy, diff_yz, diff_zx = pairwise_difference
-                    list_diff_xy.append(diff_xy)
-                    list_diff_yz.append(diff_yz)
-                    list_diff_zx.append(diff_zx)
+            if tempSaveDir is not None:
+                os.makedirs(tempSaveDir, exist_ok=True)
+                batch_MRL_values = []
+                #check existing temp files to resume
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("MRL_values_") and f.endswith(".pkl")]
+                if existing_files:
+                    #get the index of each file
+                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
+                    last_file = existing_files[-1]
+                    print(f"Resuming from existing temp file: {last_file}")
+                    start_index = int(last_file.split('_')[2].split('.')[0])
+            
+            for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
+                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                    continue  # Skip already processed groups
                     
-                # Compute MRL for XY plane
-                cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_xy])
-                sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_xy])
-                R_xy = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2) if n > 0 else 0.0
-                # Compute MRL for YZ plane
-                cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_yz])
-                sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_yz])
-                R_yz = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2) if n > 0 else 0.0
-                # Compute MRL for ZX plane
-                cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_zx])
-                sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_zx])
-                R_zx = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2) if n > 0 else 0.0
-                # Don't take average, append all three values
-                self.MRL_values.extend([R_xy, R_yz, R_zx])
+                print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r')
+                
+                R_values = ListGalaxyGroup._compute_MRL_for_group(galaxyGroup)
+                
+                if tempSaveDir is not None:
+                    batch_MRL_values.extend(R_values)
+                else:
+                    self.MRL_values.extend(R_values)
+                    
+                #temp save after every 100 groups
+                if tempSaveDir is not None and i % 100 == 0:
+                    print(f"\nIntermediate save after processing {i} galaxy groups.")
+                    temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{i}.pkl")
+                    with open(temp_save_path, 'wb') as f:
+                        pickle.dump(batch_MRL_values, f)
+                    batch_MRL_values = []
+            # Final save after all groups processed
+            if tempSaveDir is not None:
+                print(f"\nFinal save after processing all galaxy groups.")
+                temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{self.getNumGalaxyGroups()}.pkl")
+                with open(temp_save_path, 'wb') as f:
+                    pickle.dump(batch_MRL_values, f)
+                    batch_MRL_values = []
+            # accumulate results based on all saved batches
+            if tempSaveDir is not None:
+                self.MRL_values = []
+                for filename in os.listdir(tempSaveDir):
+                    if filename.startswith("MRL_values_") and filename.endswith(".pkl"):
+                        file_path = os.path.join(tempSaveDir, filename)
+                        with open(file_path, 'rb') as f:
+                            batch_data = pickle.load(f)
+                            self.MRL_values.extend(batch_data)
+            
         return self.MRL_values
             
-    def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05, parallelize: bool=False, n_processes: Optional[int]=None, tempSaveDir: Optional[str]=None) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_MRL_directionality
         Computes the probability distribution of Mean Resultant Length (MRL) directionality for each galaxy group.
@@ -266,7 +297,7 @@ class ListGalaxyGroup:
         :rtype: tuple[np.ndarray, np.ndarray]
         '''
         if not self.MRL_values:
-            self.compute_all_MRL_directionality()
+            self.compute_all_MRL_directionality(parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir)
         else:
             print("Using pre-computed MRL directionality values.")
         bins = np.arange(0, 1 + bin_size, bin_size)
@@ -274,7 +305,7 @@ class ListGalaxyGroup:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
         
-    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : float=1000, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
+    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -294,13 +325,15 @@ class ListGalaxyGroup:
         :param n_processes: Number of processes to use if parallelizing (default is None, which uses optimal number)
         '''
         list_filtered_galaxy_groups : list[GalaxyGroup]= []
-        total = len(self.listGalaxyGroups)
+        # total = len(self.listGalaxyGroups)
             
         # Prepare arguments for parallel processing
         args_list = [
             (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200)
             for gg in self.listGalaxyGroups
         ]
+        total = len(args_list)
+        print(f"total to process: {total}")
         
         if parallelize:
             if n_processes is None:
@@ -326,11 +359,12 @@ class ListGalaxyGroup:
             print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         else:
             list_filtered_galaxy_groups : list[GalaxyGroup]= []
-            for args in args_list:
-                print(f"Progress: Processing Galaxy Group ID {args[0].getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            for i, args in enumerate(args_list):
+                print(f"Progress: Processing Galaxy Group ID {i+1} / {total}", end='\r')
                 list_filtered_galaxy_groups.append(ListGalaxyGroup._filter_subhalos_for_group(args))
                     
             # self.setGalaxyGroups([gg for gg in list_filtered_galaxy_groups if gg is not None])
+            list_filtered_galaxy_groups = [gg for gg in list_filtered_galaxy_groups if gg is not None]
             
         # return self.getAllGalaxyGroups()
         return list_filtered_galaxy_groups
@@ -588,38 +622,43 @@ class ListGalaxyGroup:
         return group_pairwise_differences
 
     @staticmethod
-    def _compute_MRL_for_group(pairwise_group):
-        """Helper function to compute MRL for a single galaxy group's pairwise differences."""
+    def _compute_MRL_for_group(galaxyGroup):
+        """Helper function to compute MRL for a single galaxy group using individual satellite angles.
+        
+        Computes the Mean Resultant Length for each plane (XY, YZ, ZX) based on the angular
+        distribution of satellites relative to the central galaxy.
+        """
         import numpy as np
         
-        n = len(pairwise_group)
+        subhalos = galaxyGroup.getSubhalos()
+        n = len(subhalos)
+        
         if n == 0:
             return [0.0, 0.0, 0.0]
         
-        list_diff_xy = []
-        list_diff_yz = []
-        list_diff_zx = []
+        central_pos = galaxyGroup.getPos()
         
-        for pairwise_difference in pairwise_group:
-            diff_xy, diff_yz, diff_zx = pairwise_difference
-            list_diff_xy.append(diff_xy)
-            list_diff_yz.append(diff_yz)
-            list_diff_zx.append(diff_zx)
+        # Vectorize: Get all satellite positions at once
+        positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
+        rel_pos = positions - central_pos
         
-        # Compute MRL for XY plane
-        cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_xy])
-        sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_xy])
-        R_xy = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+        # Compute angles for each satellite in each plane
+        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane
+        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane
+        angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])  # ZX plane
         
-        # Compute MRL for YZ plane
-        cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_yz])
-        sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_yz])
-        R_yz = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+        # Compute MRL for each plane: R = (1/N) * sqrt( (sum(cos(theta_i)))^2 + (sum(sin(theta_i)))^2 )
+        cos_sum_xy = np.sum(np.cos(angles_xy))
+        sin_sum_xy = np.sum(np.sin(angles_xy))
+        R_xy = (1/n) * np.sqrt(cos_sum_xy**2 + sin_sum_xy**2)
         
-        # Compute MRL for ZX plane
-        cosComponent = np.sum([np.cos(np.radians(angle)) for angle in list_diff_zx])
-        sinComponent = np.sum([np.sin(np.radians(angle)) for angle in list_diff_zx])
-        R_zx = (1/n) * np.sqrt(cosComponent**2 + sinComponent**2)
+        cos_sum_yz = np.sum(np.cos(angles_yz))
+        sin_sum_yz = np.sum(np.sin(angles_yz))
+        R_yz = (1/n) * np.sqrt(cos_sum_yz**2 + sin_sum_yz**2)
+        
+        cos_sum_zx = np.sum(np.cos(angles_zx))
+        sin_sum_zx = np.sum(np.sin(angles_zx))
+        R_zx = (1/n) * np.sqrt(cos_sum_zx**2 + sin_sum_zx**2)
         
         return [R_xy, R_yz, R_zx]
 
@@ -632,6 +671,7 @@ class ListGalaxyGroup:
         
         galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200 = args
         
+        # print(f"masses: {minGGMass, galaxyGroup.getMCrit200()}")
         if minGGMass is not None and galaxyGroup.getMCrit200() < minGGMass:
             return None
         if maxGGMass is not None and galaxyGroup.getMCrit200() > maxGGMass:
@@ -641,7 +681,7 @@ class ListGalaxyGroup:
         galaxyGroupCM = galaxyGroup.getPosCM()
         
         distance = np.linalg.norm(central_pos - galaxyGroupCM)
-        if distance > centralPosTolerance_kpc:
+        if centralPosTolerance_kpc is not None and distance > centralPosTolerance_kpc:
             return None  # Signal to skip this group
         
         filtered_subhalos = []
@@ -665,6 +705,9 @@ class ListGalaxyGroup:
                 print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
                 if distance_to_central > galaxyGroup.getRCrit200():
                     continue
+
+            # If we made it past all filters, add the subhalo
+            filtered_subhalos.append(subhalo)
         
         if len(filtered_subhalos) == 0:
             return None
