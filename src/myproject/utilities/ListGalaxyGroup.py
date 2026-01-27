@@ -84,6 +84,13 @@ class ListGalaxyGroup:
     def getGalaxyGroupI(self, i):
         return self.listGalaxyGroups[i]
 
+    def getSubhaloByID(self, subhalo_id : int) -> Subhalo | None:
+        for galaxyGroup in self.listGalaxyGroups:
+            subhalo = galaxyGroup.getSubhaloByID(subhalo_id)
+            if subhalo is not None:
+                return subhalo
+        return None
+
     def getAverageNumSubhalosPerGalaxyGroup(self) -> float:
         total_subhalos = sum(gg.getNumSubhalos() for gg in self.listGalaxyGroups)
         return total_subhalos / self.lenGalaxyGroups if self.lenGalaxyGroups > 0 else 0.0
@@ -121,21 +128,13 @@ class ListGalaxyGroup:
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
         else:
+            start_index = 0
             if tempSaveDir is not None:
                 os.makedirs(tempSaveDir, exist_ok=True)
                 batch_list_pairwise_differences = []
                 
                 #check existing temp files to resume
-                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".pkl")]
-                if existing_files:
-                    #get the index of each file
-                    existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
-                    last_file = existing_files[-1]
-                    print(f"Resuming from existing temp file: {last_file}")
-                    start_index = int(last_file.split('_')[2].split('.')[0])
-                
-                #check existing temp files to resume
-                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".pkl")]
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".hdf5")]
                 if existing_files:
                     #get the index of each file
                     existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
@@ -144,9 +143,7 @@ class ListGalaxyGroup:
                     start_index = int(last_file.split('_')[2].split('.')[0])
                 
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
-                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
-                    continue  # Skip already processed groups
-                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                if tempSaveDir is not None and i <= start_index:
                     continue  # Skip already processed groups
                 print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 group_pairwise_differences = []
@@ -160,17 +157,37 @@ class ListGalaxyGroup:
                 #temp save after every 100 groups
                 if i % 100 == 0 and tempSaveDir is not None:
                     print(f"\nIntermediate save after processing {i} galaxy groups.")
-                    temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{i}.pkl")
-                    with open(temp_save_path, 'wb') as f:
-                        pickle.dump(batch_list_pairwise_differences, f)
+                    temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{i}.hdf5")
+                    with h5.File(temp_save_path, 'w') as f:
+                        grp = f.create_group('PairwiseDifferences')
+                        for j, group_data in enumerate(batch_list_pairwise_differences):
+                    #         group_grp = grp.create_group(f'GalaxyGroup_{j}')
+                    #         # Store each pairwise difference as a dataset
+                    #         for k, pair in enumerate(group_data):
+                    #             group_grp.create_dataset(f'Pair_{k}', data=np.array(pair))
+                    
+                    # save as flattened array to save space
+                            group_grp = grp.create_group(f'GalaxyGroup_{j}')
+                            # Store each pairwise difference as a single flattened dataset
+                            flattened_data = np.array([angle for pair in group_data for angle in pair])
+                            group_grp.create_dataset('PairwiseDifferences', data=flattened_data)
                     batch_list_pairwise_differences = []
                         
             # Final save after all groups processed
             if tempSaveDir is not None:
                 print(f"\nFinal save after processing all galaxy groups.")
-                temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{self.getNumGalaxyGroups()}.pkl")
-                with open(temp_save_path, 'wb') as f:
-                    pickle.dump(batch_list_pairwise_differences, f)
+                temp_save_path = os.path.join(tempSaveDir, f"pairwise_differences_{self.getNumGalaxyGroups()}.hdf5")
+                with h5.File(temp_save_path, 'w') as f:
+                    grp = f.create_group('PairwiseDifferences')
+                    for j, group_data in enumerate(batch_list_pairwise_differences):
+                        group_grp = grp.create_group(f'GalaxyGroup_{j}')
+                        # # Store each pairwise difference as a dataset
+                        # for k, pair in enumerate(group_data):
+                        #     group_grp.create_dataset(f'Pair_{k}', data=np.array(pair))
+                        
+                        # save as flattened array to save space
+                        flattened_data = np.array([angle for pair in group_data for angle in pair])
+                        group_grp.create_dataset('PairwiseDifferences', data=flattened_data)
                     batch_list_pairwise_differences = []
                     
             # accumulate results based on all saved batches
@@ -178,37 +195,62 @@ class ListGalaxyGroup:
                 print("Accumulating results from saved batches...")
                 self.list_pairwise_differences = []
                 for filename in os.listdir(tempSaveDir):
-                    if filename.startswith("pairwise_differences_") and filename.endswith(".pkl"):
+                    if filename.startswith("pairwise_differences_") and filename.endswith(".hdf5"):
                         file_path = os.path.join(tempSaveDir, filename)
-                        with open(file_path, 'rb') as f:
-                            batch_data = pickle.load(f)
-                            self.list_pairwise_differences.extend(batch_data)
+                        with h5.File(file_path, 'r') as f:
+                            grp = f['PairwiseDifferences']
+                            for group_name in grp:
+                                # group_data = []
+                                # group_grp = grp[group_name]
+                                # for pair_name in group_grp:
+                                #     pair_data = group_grp[pair_name][()]
+                                #     group_data.append(pair_data)
+                                # self.list_pairwise_differences.append(group_data)
+                                
+                                #from flattened save
+                                group_grp = grp[group_name]
+                                flattened_data = group_grp['PairwiseDifferences'][:]
+                                
+                                # # Reconstruct original list of tuples from flattened data if needed
+                                # group_data = []
+                                # for i in range(0, len(flattened_data), 3):
+                                #     group_data.append((flattened_data[i], flattened_data[i+1], flattened_data[i+2]))
+                                # self.list_pairwise_differences.append(group_data)
+                                
+                                # reconstruct flattened list
+                                group_data = []
+                                for angle in flattened_data:
+                                    group_data.append(angle)
+                                self.list_pairwise_differences.append(group_data)
             
         return self.list_pairwise_differences
     
-    def compute_probablity_distribution_of_polar_differences(self, bin_size : float=5.0, parallelize: bool = False, tempSaveDir : str=None) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_polar_differences
         Computes the probability distribution of polar angle differences between satellite galaxies in each galaxy group with resepect to the host galaxy.
         Returns a tuple containing the bin centers and the corresponding probability densities.
         
         :param self: Description
-        :param bin_size: Size of the bins for the histogram (default is 5.0 degrees)
+        :param bins: Array of bin edges for the histogram (default is np.arange(0, 180 + 5, 5))
         :return: Tuple of (bin_centers, probability_densities)
         :rtype: tuple[np.ndarray, np.ndarray]
         '''
         if not self.list_pairwise_differences:
             self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir)
         pairwise_differences_flatten = []
+        # for galaxyPairwiseGroup in self.list_pairwise_differences:
+        #     for pair in galaxyPairwiseGroup:
+        #         pairwise_differences_flatten.extend(pair)  # Unpack the tuple and add each angle difference
+        
+        #since already flattened in temp save
         for galaxyPairwiseGroup in self.list_pairwise_differences:
-            for pair in galaxyPairwiseGroup:
-                pairwise_differences_flatten.extend(pair)  # Unpack the tuple and add each angle difference
-        bins = np.arange(0, 180 + bin_size, bin_size)
+            pairwise_differences_flatten.extend(galaxyPairwiseGroup)
+        # bins = np.arange(0, 180 + bin_size, bin_size)
         hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
     
-    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
     def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
@@ -250,7 +292,7 @@ class ListGalaxyGroup:
                 os.makedirs(tempSaveDir, exist_ok=True)
                 batch_MRL_values = []
                 #check existing temp files to resume
-                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("MRL_values_") and f.endswith(".pkl")]
+                existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("MRL_values_") and f.endswith(".hdf5")]
                 if existing_files:
                     #get the index of each file
                     existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
@@ -274,25 +316,25 @@ class ListGalaxyGroup:
                 #temp save after every 100 groups
                 if tempSaveDir is not None and i % 100 == 0:
                     print(f"\nIntermediate save after processing {i} galaxy groups.")
-                    temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{i}.pkl")
-                    with open(temp_save_path, 'wb') as f:
-                        pickle.dump(batch_MRL_values, f)
+                    temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{i}.hdf5")
+                    with h5.File(temp_save_path, 'w') as f:
+                        dset = f.create_dataset('MRL_values', data=np.array(batch_MRL_values))
                     batch_MRL_values = []
             # Final save after all groups processed
             if tempSaveDir is not None:
                 print(f"\nFinal save after processing all galaxy groups.")
-                temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{self.getNumGalaxyGroups()}.pkl")
-                with open(temp_save_path, 'wb') as f:
-                    pickle.dump(batch_MRL_values, f)
-                    batch_MRL_values = []
+                temp_save_path = os.path.join(tempSaveDir, f"MRL_values_{self.getNumGalaxyGroups()}.hdf5")
+                with h5.File(temp_save_path, 'w') as f:
+                    dset = f.create_dataset('MRL_values', data=np.array(batch_MRL_values))
+                batch_MRL_values = []
             # accumulate results based on all saved batches
             if tempSaveDir is not None:
                 self.MRL_values = []
                 for filename in os.listdir(tempSaveDir):
-                    if filename.startswith("MRL_values_") and filename.endswith(".pkl"):
+                    if filename.startswith("MRL_values_") and filename.endswith(".hdf5"):
                         file_path = os.path.join(tempSaveDir, filename)
-                        with open(file_path, 'rb') as f:
-                            batch_data = pickle.load(f)
+                        with h5.File(file_path, 'r') as f:
+                            batch_data = f['MRL_values'][:]
                             self.MRL_values.extend(batch_data)
             
         return self.MRL_values
@@ -514,15 +556,57 @@ class ListGalaxyGroup:
             
             print(f"\nCompleted writing {len(serialized_data)} galaxy groups to HDF5.")
                     
-    def load_from_hdf5(self, h5file : h5.File):
+    def load_from_hdf5(self, h5file : h5.File, parallelize: bool=False, n_processes: Optional[int]=None):
         self.listGalaxyGroups = []
         self.headerInformation = {}
         for key, value in h5file.attrs.items():
             self.headerInformation[key] = value
+        
         grp = h5file['GalaxyGroups']
-        for i, gg_key in enumerate(grp):
-            print(f"Progress: {i+1}/{len(grp)}", end='\r')
-            gg_grp : h5.Group = grp[gg_key]
+        gg_keys = list(grp.keys())
+        total = len(gg_keys)
+        
+        if parallelize:
+            if n_processes is None:
+                n_processes = get_optimal_processes(total)
+            
+            print(f"Loading from HDF5 in parallel with {n_processes} processes...")
+            
+            # Create filename to pass to worker (HDF5 objects can't be pickled)
+            h5_filename = h5file.filename
+            
+            import multiprocessing as mp
+            with mp.Pool(processes=n_processes) as pool:
+                args_list = [(h5_filename, gg_key) for gg_key in gg_keys]
+                results = []
+                for i, result in enumerate(pool.imap(ListGalaxyGroup._load_group_from_hdf5, args_list), 1):
+                    results.append(result)
+                    percent = (i / total) * 100
+                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                print()  # New line after progress
+            
+            self.listGalaxyGroups = results
+        else:
+            for i, gg_key in enumerate(gg_keys):
+                print(f"Progress: {i+1}/{total}", end='\r')
+                galaxyGroup = ListGalaxyGroup._load_group_from_hdf5((h5file.filename, gg_key))
+                self.listGalaxyGroups.append(galaxyGroup)
+        
+        self.lenGalaxyGroups = len(self.listGalaxyGroups)
+        print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
+
+
+    # Standalone functions for multiprocessing (must be picklable)
+    @staticmethod
+    def _load_group_from_hdf5(args):
+        """Helper function to load a single galaxy group from HDF5 file."""
+        import h5py as h5
+        from myproject.utilities.Subhalo import Subhalo
+        
+        h5_filename, gg_key = args
+        
+        with h5.File(h5_filename, 'r') as h5file:
+            gg_grp = h5file['GalaxyGroups'][gg_key]
             galaxy_group_id = gg_grp.attrs['group_id']
             RCrit200 = gg_grp.attrs['RCrit200']
             MCrit200 = gg_grp.attrs['MCrit200']
@@ -530,9 +614,9 @@ class ListGalaxyGroup:
             pos = gg_grp.attrs['pos']
             galaxyGroup = GalaxyGroup(galaxy_group_id, RCrit200, MCrit200, posCM, pos, listSubhalos=[])
             
-            subhalos_grp : h5.Group = gg_grp['Subhalos']
+            subhalos_grp = gg_grp['Subhalos']
             for sh_key in subhalos_grp:
-                sh_grp : h5.Group = subhalos_grp[sh_key]
+                sh_grp = subhalos_grp[sh_key]
                 idx = sh_grp.attrs['idx']
                 group_id = sh_grp.attrs['group_id']
                 flag = sh_grp.attrs['flag']
@@ -546,9 +630,8 @@ class ListGalaxyGroup:
                 
                 subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities)
                 galaxyGroup.addSubhalo(subhalo)
-            
-            self.addGalaxyGroup(galaxyGroup)
-        print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
+        
+        return galaxyGroup
 
 
     # Standalone functions for multiprocessing (must be picklable)
@@ -618,14 +701,15 @@ class ListGalaxyGroup:
             print(f"    Processing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}")
             for j in range(i + 1, num_subhalos):
                 # Compute angle differences for each plane (in radians, then convert)
-                diff_xy = np.abs(angles_xy[i] - angles_xy[j])
-                diff_xy = min(diff_xy, 2 * np.pi - diff_xy)  # Shortest arc
+                # where delta_xy=0 corresponds to the same side and delta_xy=180 corresponds to opposite sides
+                delta_xy = angles_xy[i] - angles_xy[j]
+                delta_yz = angles_yz[i] - angles_yz[j]
+                delta_zx = angles_zx[i] - angles_zx[j]
                 
-                diff_yz = np.abs(angles_yz[i] - angles_yz[j])
-                diff_yz = min(diff_yz, 2 * np.pi - diff_yz)
-                
-                diff_zx = np.abs(angles_zx[i] - angles_zx[j])
-                diff_zx = min(diff_zx, 2 * np.pi - diff_zx)
+                # Normalize differences to [0, π]
+                diff_xy = np.abs((delta_xy + np.pi) % (2 * np.pi) - np.pi)
+                diff_yz = np.abs((delta_yz + np.pi) % (2 * np.pi) - np.pi)
+                diff_zx = np.abs((delta_zx + np.pi) % (2 * np.pi) - np.pi)
                 
                 # Convert to degrees
                 pairwise_difference = (diff_xy * deg, diff_yz * deg, diff_zx * deg)
@@ -714,7 +798,7 @@ class ListGalaxyGroup:
                 continue
             if satWithinR200:
                 distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
-                print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
+                # print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
                 if distance_to_central > galaxyGroup.getRCrit200():
                     continue
 
@@ -736,7 +820,7 @@ class ListGalaxyGroup:
 
     @staticmethod
     def _correct_positions_for_group(args):
-        """Helper function to correct positions for a single galaxy group."""
+        """Helper function to correct positions for a single galaxy group. Make all positions relative to central galaxy."""
         from myproject.utilities.Subhalo import Subhalo
         import numpy as np
         
@@ -748,14 +832,9 @@ class ListGalaxyGroup:
         # Correct group CM position
         corrected_galaxyGroupCM = np.zeros(3)
         for dim in range(3):
-            delta = galaxyGroupCM[dim] - central_pos[dim]
-            if delta > boxsize / 2:
-                corrected_coord = galaxyGroupCM[dim] - boxsize
-            elif delta < -boxsize / 2:
-                corrected_coord = galaxyGroupCM[dim] + boxsize
-            else:
-                corrected_coord = galaxyGroupCM[dim]
-            corrected_galaxyGroupCM[dim] = corrected_coord
+            rel_pos = galaxyGroupCM[dim] - central_pos[dim]
+            # Wrap to [-boxsize/2, boxsize/2]
+            corrected_galaxyGroupCM[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
         galaxyGroup.setPosCM(corrected_galaxyGroupCM)
         
         # Set central position to origin
@@ -767,14 +846,9 @@ class ListGalaxyGroup:
             position = subhalo.getPosition()
             corrected_position = np.zeros(3)
             for dim in range(3):
-                delta = position[dim] - central_pos[dim]
-                if delta > boxsize / 2:
-                    corrected_coord = position[dim] - boxsize
-                elif delta < -boxsize / 2:
-                    corrected_coord = position[dim] + boxsize
-                else:
-                    corrected_coord = position[dim]
-                corrected_position[dim] = corrected_coord
+                rel_pos = position[dim] - central_pos[dim]
+                # Wrap to [-boxsize/2, boxsize/2]
+                corrected_position[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
             subhalo.setPosition(corrected_position)
         
         return galaxyGroup

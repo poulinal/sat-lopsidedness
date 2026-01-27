@@ -52,5 +52,11 @@ class GalaxyGroup:
     def setRCrit200(self, newRCrit200 : float):
         self.RCrit200 = newRCrit200
     
+    def getSubhaloByID(self, subhalo_id : int) -> Subhalo | None:
+        for subhalo in self.listSubhalos:
+            if subhalo.getIdx() == subhalo_id:
+                return subhalo
+        # print("Couldnt find subhalo idx")
+        return None
     
     
