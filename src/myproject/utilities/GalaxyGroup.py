@@ -24,6 +24,11 @@ class GalaxyGroup:
     
     def getSubhalos(self) -> list[Subhalo]:
         return self.listSubhalos
+
+    def getSatelliteSubhalos(self) -> list[Subhalo]:
+        # Return only satellite subhalos (exclude central which has pos (0, 0, 0))
+        satellite_subhalos = [subhalo for subhalo in self.listSubhalos if not np.allclose(subhalo.getPos(), np.zeros(3))]
+        return satellite_subhalos
     
     def getGroupID(self):
         return self.group_id

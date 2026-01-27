@@ -247,6 +247,7 @@ class ListGalaxyGroup:
         for galaxyPairwiseGroup in self.list_pairwise_differences:
             pairwise_differences_flatten.extend(galaxyPairwiseGroup)
         # bins = np.arange(0, 180 + bin_size, bin_size)
+        print(f"bins: {bins}")
         hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         return bin_centers, hist
@@ -644,7 +645,7 @@ class ListGalaxyGroup:
         """
         import numpy as np
         
-        subhalos = galaxyGroup.getSubhalos()
+        subhalos = galaxyGroup.getSatelliteSubhalos()
         num_subhalos = len(subhalos)
         if num_subhalos < 2:
             return []
@@ -726,7 +727,8 @@ class ListGalaxyGroup:
         """
         import numpy as np
         
-        subhalos = galaxyGroup.getSubhalos()
+        subhalos = galaxyGroup.getSatelliteSubhalos()
+        id = galaxyGroup.getGroupID()
         n = len(subhalos)
         
         if n == 0:
@@ -736,25 +738,50 @@ class ListGalaxyGroup:
         
         # Vectorize: Get all satellite positions at once
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
+        print(f"real positions: {positions}")
         rel_pos = positions - central_pos
+
+        print(f"rel_pos: {rel_pos}") if id == 0 else None
         
-        # Compute angles for each satellite in each plane
-        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane
-        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane
-        angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])  # ZX plane
+        #compute angle based on cosine to avoid issues with arctan2
+        # r = np.sqrt(rel_pos[:, 0]**2 + rel_pos[:, 1]**2)
+        r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
+        r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
+        r_zx = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
+
+        print(f"r_xy: {r_xy}") if id == 0 else None
+        print(f"r_yz: {r_yz}") if id == 0 else None
+        print(f"r_zx: {r_zx}") if id == 0 else None
+        # r = np.linalg.norm(rel_pos, axis=1)  # sqrt(x^2 + y^2 + z^2) per row
+        cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
+        cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
+        cos_theta_zx = abs(rel_pos[:, 2]) / r_zx # cos(theta) = z/r
         
-        # Compute MRL for each plane: R = (1/N) * sqrt( (sum(cos(theta_i)))^2 + (sum(sin(theta_i)))^2 )
+        angles_xy = np.arccos(cos_theta_xy)
+        angles_yz = np.arccos(cos_theta_yz)
+        angles_zx = np.arccos(cos_theta_zx)
+        
+        #normalize to [0, 2pi]
+        angles_xy = angles_xy % (2 * np.pi)
+        angles_yz = angles_yz % (2 * np.pi)
+        angles_zx = angles_zx % (2 * np.pi)
+        
+        # Compute MRL for XY plane
         cos_sum_xy = np.sum(np.cos(angles_xy))
         sin_sum_xy = np.sum(np.sin(angles_xy))
         R_xy = (1/n) * np.sqrt(cos_sum_xy**2 + sin_sum_xy**2)
         
+        # Compute MRL for YZ plane
         cos_sum_yz = np.sum(np.cos(angles_yz))
         sin_sum_yz = np.sum(np.sin(angles_yz))
         R_yz = (1/n) * np.sqrt(cos_sum_yz**2 + sin_sum_yz**2)
         
+        # Compute MRL for ZX plane
         cos_sum_zx = np.sum(np.cos(angles_zx))
         sin_sum_zx = np.sum(np.sin(angles_zx))
         R_zx = (1/n) * np.sqrt(cos_sum_zx**2 + sin_sum_zx**2)
+
+        print(f"final: {[R_xy, R_yz, R_zx]}")
         
         return [R_xy, R_yz, R_zx]
 

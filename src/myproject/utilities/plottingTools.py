@@ -158,6 +158,7 @@ class AstroPlotter:
                     ylim: Optional[Tuple[float, float]] = None,
                     colorbar: bool = True,
                     output_filename: Optional[str] = None,
+                    grid : bool = False,
                     **kwargs) -> Tuple[Figure, Axes]:
         """
         Create a scatter plot.
@@ -229,6 +230,9 @@ class AstroPlotter:
         if title:
             ax.set_title(title)
         
+        if grid:
+            ax.grid(True, which='both', linestyle='--', alpha=0.5)
+            
         # Colorbar
         if c is not None and colorbar:
             cbar = plt.colorbar(sc, ax=ax, pad=0.02)
