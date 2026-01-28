@@ -95,6 +95,12 @@ class ListGalaxyGroup:
         total_subhalos = sum(gg.getNumSubhalos() for gg in self.listGalaxyGroups)
         return total_subhalos / self.lenGalaxyGroups if self.lenGalaxyGroups > 0 else 0.0
     
+    def getRangeOfNumSubhalos(self) -> tuple[int, int]:
+        if not self.listGalaxyGroups:
+            return (0, 0)
+        num_subhalos_list = [len(gg.getSatelliteSubhalos()) for gg in self.listGalaxyGroups]
+        return (min(num_subhalos_list), max(num_subhalos_list))
+    
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
             
@@ -690,9 +696,24 @@ class ListGalaxyGroup:
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
         rel_pos = positions - central_pos
 
-        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
-        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
-        angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+        # angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
+        # angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
+        # angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+        
+        #compute angle based on cosine to avoid issues with arctan2
+        r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
+        r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
+        r_zx = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
+        cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
+        cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
+        cos_theta_zx = abs(rel_pos[:, 2]) / r_zx # cos(theta) = z/r
+        angles_xy = np.arccos(cos_theta_xy)
+        angles_yz = np.arccos(cos_theta_yz)
+        angles_zx = np.arccos(cos_theta_zx)
+        #normalize to [0, 2pi]
+        angles_xy = angles_xy % (2 * np.pi)
+        angles_yz = angles_yz % (2 * np.pi)
+        angles_zx = angles_zx % (2 * np.pi)
 
         # Stream-compute pairwise differences without allocating full matrices
         group_pairwise_differences = []
@@ -861,7 +882,12 @@ class ListGalaxyGroup:
         for dim in range(3):
             rel_pos = galaxyGroupCM[dim] - central_pos[dim]
             # Wrap to [-boxsize/2, boxsize/2]
-            corrected_galaxyGroupCM[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
+            if abs(rel_pos) > boxsize / 2:
+                if rel_pos > 0:
+                    rel_pos -= boxsize
+                else:
+                    rel_pos += boxsize
+            # corrected_galaxyGroupCM[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
         galaxyGroup.setPosCM(corrected_galaxyGroupCM)
         
         # Set central position to origin
@@ -875,7 +901,12 @@ class ListGalaxyGroup:
             for dim in range(3):
                 rel_pos = position[dim] - central_pos[dim]
                 # Wrap to [-boxsize/2, boxsize/2]
-                corrected_position[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
+                if abs(rel_pos) > boxsize / 2:
+                    if rel_pos > 0:
+                        rel_pos -= boxsize
+                    else:
+                        rel_pos += boxsize
+                # corrected_position[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
             subhalo.setPosition(corrected_position)
         
         return galaxyGroup

@@ -27,7 +27,12 @@ class GalaxyGroup:
 
     def getSatelliteSubhalos(self) -> list[Subhalo]:
         # Return only satellite subhalos (exclude central which has pos (0, 0, 0))
-        satellite_subhalos = [subhalo for subhalo in self.listSubhalos if not np.allclose(subhalo.getPos(), np.zeros(3))]
+        satellite_subhalos = []
+        for i, sh in enumerate(self.listSubhalos):
+            if sh.getPosition() == (0, 0, 0):
+                satellite_subhalos.append(sh)
+            if i == self.getNumSubhalos() - 1:
+                print(f"WARNING... Couldn't find central for groupID: {self.getGroupID()}")
         return satellite_subhalos
     
     def getGroupID(self):
