@@ -81,7 +81,7 @@ class ListGalaxyGroup:
     def getAllGalaxyGroups(self):
         return self.listGalaxyGroups
     
-    def getGalaxyGroupI(self, i):
+    def getGalaxyGroupI(self, i) -> GalaxyGroup:
         return self.listGalaxyGroups[i]
 
     def getSubhaloByID(self, subhalo_id : int) -> Subhalo | None:
@@ -696,24 +696,23 @@ class ListGalaxyGroup:
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
         rel_pos = positions - central_pos
 
-        # angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
-        # angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
-        # angles_zx = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
+        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
+        angles_xz = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
         
-        #compute angle based on cosine to avoid issues with arctan2
-        r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
-        r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
-        r_zx = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
-        cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
-        cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
-        cos_theta_zx = abs(rel_pos[:, 2]) / r_zx # cos(theta) = z/r
-        angles_xy = np.arccos(cos_theta_xy)
-        angles_yz = np.arccos(cos_theta_yz)
-        angles_zx = np.arccos(cos_theta_zx)
-        #normalize to [0, 2pi]
-        angles_xy = angles_xy % (2 * np.pi)
-        angles_yz = angles_yz % (2 * np.pi)
-        angles_zx = angles_zx % (2 * np.pi)
+        # #compute angle based on cosine to avoid issues with arctan2
+        # r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
+        # r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
+        # r_xz = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row 
+        # cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
+        # cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
+        # cos_theta_xz = abs(rel_pos[:, 2]) / r_xz # cos(theta) = z/r   
+        
+        # angles_xz = np.arccos(cos_theta_xz) % (2 * np.pi)
+        # angles_yz = np.arccos(cos_theta_yz) % (2 * np.pi)
+        # angles_xy = np.arccos(cos_theta_xy) % (2 * np.pi)
+        
+        
 
         # Stream-compute pairwise differences without allocating full matrices
         group_pairwise_differences = []
@@ -726,24 +725,24 @@ class ListGalaxyGroup:
                 # where delta_xy=0 corresponds to the same side and delta_xy=180 corresponds to opposite sides
                 delta_xy = angles_xy[i] - angles_xy[j]
                 delta_yz = angles_yz[i] - angles_yz[j]
-                delta_zx = angles_zx[i] - angles_zx[j]
+                delta_xz = angles_xz[i] - angles_xz[j]
                 
                 # Normalize differences to [0, π]
                 diff_xy = np.abs((delta_xy + np.pi) % (2 * np.pi) - np.pi)
                 diff_yz = np.abs((delta_yz + np.pi) % (2 * np.pi) - np.pi)
-                diff_zx = np.abs((delta_zx + np.pi) % (2 * np.pi) - np.pi)
+                diff_xz = np.abs((delta_xz + np.pi) % (2 * np.pi) - np.pi)
                 
                 # Convert to degrees
-                pairwise_difference = (diff_xy * deg, diff_yz * deg, diff_zx * deg)
+                pairwise_difference = (diff_xy * deg, diff_yz * deg, diff_xz * deg)
                 group_pairwise_differences.append(pairwise_difference)
         
         return group_pairwise_differences
-
+    
     @staticmethod
     def _compute_MRL_for_group(galaxyGroup):
         """Helper function to compute MRL for a single galaxy group using individual satellite angles.
         
-        Computes the Mean Resultant Length for each plane (XY, YZ, ZX) based on the angular
+        Computes the Mean Resultant Length for each plane (XY, YZ, XZ) based on the angular
         distribution of satellites relative to the central galaxy.
         """
         import numpy as np
@@ -759,33 +758,38 @@ class ListGalaxyGroup:
         
         # Vectorize: Get all satellite positions at once
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
-        print(f"real positions: {positions}")
+        # print(f"real positions: {positions}")
         rel_pos = positions - central_pos
 
-        print(f"rel_pos: {rel_pos}") if id == 0 else None
+        # print(f"rel_pos: {rel_pos}") if id == 0 else None
         
-        #compute angle based on cosine to avoid issues with arctan2
-        # r = np.sqrt(rel_pos[:, 0]**2 + rel_pos[:, 1]**2)
-        r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
-        r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
-        r_zx = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
+        # Compute polar angles using arctan
+        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane: arctan2(y, x)
+        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane: arctan2(z, y)
+        angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(x, z)
+        
+        # #compute angle based on cosine to avoid issues with arctan2
+        # # r = np.sqrt(rel_pos[:, 0]**2 + rel_pos[:, 1]**2)
+        # r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
+        # r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
+        # r_xz = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
 
-        print(f"r_xy: {r_xy}") if id == 0 else None
-        print(f"r_yz: {r_yz}") if id == 0 else None
-        print(f"r_zx: {r_zx}") if id == 0 else None
-        # r = np.linalg.norm(rel_pos, axis=1)  # sqrt(x^2 + y^2 + z^2) per row
-        cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
-        cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
-        cos_theta_zx = abs(rel_pos[:, 2]) / r_zx # cos(theta) = z/r
+        # print(f"r_xy: {r_xy}") if id == 0 else None
+        # print(f"r_yz: {r_yz}") if id == 0 else None
+        # print(f"r_xz: {r_xz}") if id == 0 else None
+        # # r = np.linalg.norm(rel_pos, axis=1)  # sqrt(x^2 + y^2 + z^2) per row
+        # cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
+        # cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
+        # cos_theta_xz = abs(rel_pos[:, 2]) / r_xz # cos(theta) = z/r
         
-        angles_xy = np.arccos(cos_theta_xy)
-        angles_yz = np.arccos(cos_theta_yz)
-        angles_zx = np.arccos(cos_theta_zx)
+        # angles_xy = np.arccos(cos_theta_xy)
+        # angles_yz = np.arccos(cos_theta_yz)
+        # angles_xz = np.arccos(cos_theta_xz)
         
-        #normalize to [0, 2pi]
-        angles_xy = angles_xy % (2 * np.pi)
-        angles_yz = angles_yz % (2 * np.pi)
-        angles_zx = angles_zx % (2 * np.pi)
+        # #normalize to [0, 2pi]
+        # angles_xy = angles_xy % (2 * np.pi)
+        # angles_yz = angles_yz % (2 * np.pi)
+        # angles_xz = angles_xz % (2 * np.pi)
         
         # Compute MRL for XY plane
         cos_sum_xy = np.sum(np.cos(angles_xy))
@@ -797,14 +801,14 @@ class ListGalaxyGroup:
         sin_sum_yz = np.sum(np.sin(angles_yz))
         R_yz = (1/n) * np.sqrt(cos_sum_yz**2 + sin_sum_yz**2)
         
-        # Compute MRL for ZX plane
-        cos_sum_zx = np.sum(np.cos(angles_zx))
-        sin_sum_zx = np.sum(np.sin(angles_zx))
-        R_zx = (1/n) * np.sqrt(cos_sum_zx**2 + sin_sum_zx**2)
+        # Compute MRL for XZ plane
+        cos_sum_xz = np.sum(np.cos(angles_xz))
+        sin_sum_xz = np.sum(np.sin(angles_xz))
+        R_xz = (1/n) * np.sqrt(cos_sum_xz**2 + sin_sum_xz**2)
 
-        print(f"final: {[R_xy, R_yz, R_zx]}")
+        print(f"final: {[R_xy, R_yz, R_xz]}") if id == 0 else None
         
-        return [R_xy, R_yz, R_zx]
+        return [R_xy, R_yz, R_xz]
 
     @staticmethod
     def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float, bool]):
@@ -816,9 +820,9 @@ class ListGalaxyGroup:
         galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200 = args
         
         # print(f"masses: {minGGMass, galaxyGroup.getMCrit200()}")
-        if minGGMass is not None and galaxyGroup.getMCrit200() < minGGMass:
+        if minGGMass is not None and galaxyGroup.getMCrit200() <= minGGMass:
             return None
-        if maxGGMass is not None and galaxyGroup.getMCrit200() > maxGGMass:
+        if maxGGMass is not None and galaxyGroup.getMCrit200() >= maxGGMass:
             return None
         
         central_pos = galaxyGroup.getPos()
@@ -840,9 +844,9 @@ class ListGalaxyGroup:
                 continue
             if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
                 continue
-            if M_r_min is not None and subhalo.getRbandMagnitude() < M_r_min:
+            if M_r_min is not None and (np.isnan(subhalo.getRbandMagnitude()) or subhalo.getRbandMagnitude() <= M_r_min):
                 continue
-            if M_r_max is not None and subhalo.getRbandMagnitude() > M_r_max:
+            if M_r_max is not None and (np.isnan(subhalo.getRbandMagnitude()) or subhalo.getRbandMagnitude() >= M_r_max):
                 continue
             if satWithinR200:
                 distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
@@ -882,11 +886,11 @@ class ListGalaxyGroup:
         for dim in range(3):
             rel_pos = galaxyGroupCM[dim] - central_pos[dim]
             # Wrap to [-boxsize/2, boxsize/2]
-            if abs(rel_pos) > boxsize / 2:
-                if rel_pos > 0:
-                    rel_pos -= boxsize
-                else:
-                    rel_pos += boxsize
+            if rel_pos > boxsize / 2:
+                rel_pos -= boxsize
+            elif rel_pos < -boxsize / 2:
+                rel_pos += boxsize
+            corrected_galaxyGroupCM[dim] = rel_pos
             # corrected_galaxyGroupCM[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
         galaxyGroup.setPosCM(corrected_galaxyGroupCM)
         
@@ -907,6 +911,7 @@ class ListGalaxyGroup:
                     else:
                         rel_pos += boxsize
                 # corrected_position[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
+                corrected_position[dim] = rel_pos
             subhalo.setPosition(corrected_position)
         
         return galaxyGroup

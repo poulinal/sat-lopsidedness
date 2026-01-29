@@ -63,7 +63,7 @@ class Subhalo:
         #  the dimension 12 corresponds to twelve different projection directions (i.e. observer view angles), since the dust attenuation mode is view-dependent. In general, one can simply take the first entry for each subhalo, or a random entry for each subhalo
     
     def getRbandMagnitude(self):
-        return self.getLuminosities()[5][0]
+        return self.getLuminosities()[5]#[0]
     
     def setPosition(self, newPosition : np.ndarray):
         self.position = newPosition
