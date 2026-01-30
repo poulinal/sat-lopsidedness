@@ -10,14 +10,29 @@ class GalaxyGroup:
         self.MCrit200 = MCrit200
         self.posCM = posCM
         self.pos = pos
+        
+        self.listSatelliteSubhalos = []
+        self.centralSubhalo = None
     
-        self.listSubhalos = listSubhalos
-        # print(f"self.listSubhalos: {len(self.listSubhalos)}")
-        self.lenSubhalos = len(self.listSubhalos)
+        self.listSubhalos = self.setSubhaloList(listSubhalos)
         
     def addSubhalo(self, subhalo : Subhalo):
         self.listSubhalos.append(subhalo)
         self.lenSubhalos += 1
+        
+        # Re-identify central and satellite subhalos
+        max_mass = -1
+        central_subhalo = None
+        satellite_subhalos = []
+        for sh in self.listSubhalos:
+            if sh.getMass() > max_mass:
+                max_mass = sh.getMass()
+                central_subhalo = sh
+        for sh in self.listSubhalos:
+            if sh != central_subhalo:
+                satellite_subhalos.append(sh)
+        self.setCentralSubhalo(central_subhalo)
+        self.setSatelliteSubhalos(satellite_subhalos)
         
     def getNumSubhalos(self):
         return self.lenSubhalos
@@ -27,13 +42,10 @@ class GalaxyGroup:
 
     def getSatelliteSubhalos(self) -> list[Subhalo]:
         # Return only satellite subhalos (exclude central which has pos (0, 0, 0))
-        satellite_subhalos = []
-        for i, sh in enumerate(self.listSubhalos):
-            if not np.allclose(sh.getPosition(), np.array([0.0, 0.0, 0.0])):
-                satellite_subhalos.append(sh)
-            if i == self.getNumSubhalos() - 1:
-                print(f"WARNING... Couldn't find central for groupID: {self.getGroupID()}")
-        return satellite_subhalos
+        return self.listSatelliteSubhalos
+    
+    def getCentralSubhalo(self) -> Subhalo:
+        return self.centralSubhalo
     
     def getGroupID(self):
         return self.group_id
@@ -52,6 +64,32 @@ class GalaxyGroup:
     
     def getSubhaloI(self, i):
         return self.listSubhalos[i]
+    
+    def setSubhaloList(self, newListSubhalos : list[Subhalo]):
+        self.listSubhalos = newListSubhalos
+        self.lenSubhalos = len(newListSubhalos)
+        
+        # Identify central (largest subhalo in group) and satellite subhalos
+        max_mass = -1
+        central_subhalo = None
+        satellite_subhalos = []
+        for subhalo in newListSubhalos:
+            if subhalo.getMass() > max_mass:
+                max_mass = subhalo.getMass()
+                central_subhalo = subhalo
+        for subhalo in newListSubhalos:
+            if subhalo != central_subhalo:
+                satellite_subhalos.append(subhalo)
+        self.setCentralSubhalo(central_subhalo)
+        self.setSatelliteSubhalos(satellite_subhalos)
+        
+        return newListSubhalos
+    
+    def setCentralSubhalo(self, central_subhalo : Subhalo):
+        self.centralSubhalo = central_subhalo
+        
+    def setSatelliteSubhalos(self, satellite_subhalos : list[Subhalo]):
+        self.listSatelliteSubhalos = satellite_subhalos
     
     def setPosCM(self, newPosCM : np.ndarray):
         self.posCM = newPosCM

@@ -602,7 +602,6 @@ class ListGalaxyGroup:
         self.lenGalaxyGroups = len(self.listGalaxyGroups)
         print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
 
-
     # Standalone functions for multiprocessing (must be picklable)
     @staticmethod
     def _load_group_from_hdf5(args):
@@ -640,10 +639,8 @@ class ListGalaxyGroup:
         
         return galaxyGroup
 
-
-    # Standalone functions for multiprocessing (must be picklable)
     @staticmethod
-    def _compute_pairwise_for_group(galaxyGroup):
+    def _compute_pairwise_for_group(galaxyGroup : GalaxyGroup) -> list[tuple[float, float, float]]:
         """Helper function to compute pairwise differences for a single galaxy group.
         
         Memory-efficient streaming approach: computes angles upfront (minimal memory),
@@ -656,41 +653,7 @@ class ListGalaxyGroup:
         if num_subhalos < 2:
             return []
 
-        central_pos = galaxyGroup.getPos()
-        # group_pairwise_differences = []
-        
-        # for i in range(num_subhalos):
-        #     print(f"    Processing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()}", end='\r')
-        #     for j in range(i + 1, num_subhalos):
-        #         pos_i = subhalos[i].getPosition()
-        #         pos_j = subhalos[j].getPosition()
-                
-        #         # XY plane
-        #         vec_i_xy = np.array([pos_i[0] - central_pos[0], pos_i[1] - central_pos[1]])
-        #         vec_j_xy = np.array([pos_j[0] - central_pos[0], pos_j[1] - central_pos[1]])
-        #         angle_i_xy = np.arctan2(vec_i_xy[1], vec_i_xy[0])
-        #         angle_j_xy = np.arctan2(vec_j_xy[1], vec_j_xy[0])
-        #         diff_xy = np.abs(angle_i_xy - angle_j_xy) * (180.0 / np.pi)
-        #         diff_xy = diff_xy if diff_xy <= 180 else 360 - diff_xy
-                
-        #         # YZ plane
-        #         vec_i_yz = np.array([pos_i[1] - central_pos[1], pos_i[2] - central_pos[2]])
-        #         vec_j_yz = np.array([pos_j[1] - central_pos[1], pos_j[2] - central_pos[2]])
-        #         angle_i_yz = np.arctan2(vec_i_yz[1], vec_i_yz[0])
-        #         angle_j_yz = np.arctan2(vec_j_yz[1], vec_j_yz[0])
-        #         diff_yz = np.abs(angle_i_yz - angle_j_yz) * (180.0 / np.pi)
-        #         diff_yz = diff_yz if diff_yz <= 180 else 360 - diff_yz
-                
-        #         # ZX plane
-        #         vec_i_zx = np.array([pos_i[2] - central_pos[2], pos_i[0] - central_pos[0]])
-        #         vec_j_zx = np.array([pos_j[2] - central_pos[2], pos_j[0] - central_pos[0]])
-        #         angle_i_zx = np.arctan2(vec_i_zx[1], vec_i_zx[0])
-        #         angle_j_zx = np.arctan2(vec_j_zx[1], vec_j_zx[0])
-        #         diff_zx = np.abs(angle_i_zx - angle_j_zx) * (180.0 / np.pi)
-        #         diff_zx = diff_zx if diff_zx <= 180 else 360 - diff_zx
-                
-        #         pairwise_difference = (diff_xy, diff_yz, diff_zx)
-        #         group_pairwise_differences.append(pairwise_difference)
+        central_pos = galaxyGroup.getCentralSubhalo().getPosition()
         
         # Vectorize angle computation (minimal memory footprint)
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
@@ -699,19 +662,6 @@ class ListGalaxyGroup:
         angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
         angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
         angles_xz = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
-        
-        # #compute angle based on cosine to avoid issues with arctan2
-        # r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
-        # r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
-        # r_xz = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row 
-        # cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
-        # cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
-        # cos_theta_xz = abs(rel_pos[:, 2]) / r_xz # cos(theta) = z/r   
-        
-        # angles_xz = np.arccos(cos_theta_xz) % (2 * np.pi)
-        # angles_yz = np.arccos(cos_theta_yz) % (2 * np.pi)
-        # angles_xy = np.arccos(cos_theta_xy) % (2 * np.pi)
-        
         
 
         # Stream-compute pairwise differences without allocating full matrices
@@ -739,7 +689,7 @@ class ListGalaxyGroup:
         return group_pairwise_differences
     
     @staticmethod
-    def _compute_MRL_for_group(galaxyGroup):
+    def _compute_MRL_for_group(galaxyGroup : GalaxyGroup) -> list[float]:
         """Helper function to compute MRL for a single galaxy group using individual satellite angles.
         
         Computes the Mean Resultant Length for each plane (XY, YZ, XZ) based on the angular
@@ -754,14 +704,11 @@ class ListGalaxyGroup:
         if n == 0:
             return [0.0, 0.0, 0.0]
         
-        central_pos = galaxyGroup.getPos()
+        central_pos = galaxyGroup.getCentralSubhalo().getPosition()
         
         # Vectorize: Get all satellite positions at once
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
-        # print(f"real positions: {positions}")
         rel_pos = positions - central_pos
-
-        # print(f"rel_pos: {rel_pos}") if id == 0 else None
         
         # Compute polar angles using arctan
         angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane: arctan2(y, x)
@@ -825,7 +772,7 @@ class ListGalaxyGroup:
         if maxGGMass is not None and galaxyGroup.getMCrit200() >= maxGGMass:
             return None
         
-        central_pos = galaxyGroup.getPos()
+        central_pos = galaxyGroup.getCentralSubhalo().getPosition()
         galaxyGroupCM = galaxyGroup.getPosCM()
         
         distance = np.linalg.norm(central_pos - galaxyGroupCM)
@@ -871,32 +818,24 @@ class ListGalaxyGroup:
         return filtered_galaxyGroup
 
     @staticmethod
-    def _correct_positions_for_group(args):
+    def _correct_positions_for_group(args : tuple[GalaxyGroup, float]):
         """Helper function to correct positions for a single galaxy group. Make all positions relative to central galaxy."""
         from myproject.utilities.Subhalo import Subhalo
         import numpy as np
         
         galaxyGroup, boxsize = args
         
-        central_pos = galaxyGroup.getPos()
-        galaxyGroupCM = galaxyGroup.getPosCM()
+        central_pos = galaxyGroup.getCentralSubhalo().getPosition()
+        # Set central galaxy position to origin
+        corrected_central_pos = np.zeros(3)
         
+        galaxyGroupCM = galaxyGroup.getPosCM()
         # Correct group CM position
-        corrected_galaxyGroupCM = np.zeros(3)
-        for dim in range(3):
-            rel_pos = galaxyGroupCM[dim] - central_pos[dim]
-            # Wrap to [-boxsize/2, boxsize/2]
-            if rel_pos > boxsize / 2:
-                rel_pos -= boxsize
-            elif rel_pos < -boxsize / 2:
-                rel_pos += boxsize
-            corrected_galaxyGroupCM[dim] = rel_pos
-            # corrected_galaxyGroupCM[dim] = ((rel_pos + boxsize/2) % boxsize) - boxsize/2
+        corrected_galaxyGroupCM = ListGalaxyGroup.correctPositionWRTBoxsize(boxsize, central_pos, galaxyGroupCM)
         galaxyGroup.setPosCM(corrected_galaxyGroupCM)
         
-        # Set central position to origin
-        corrected_central_pos = np.zeros(3)
-        galaxyGroup.setPos(corrected_central_pos)
+        corrected_galaxyGroup_pos = ListGalaxyGroup.correctPositionWRTBoxsize(boxsize, central_pos, galaxyGroup.getPos())
+        galaxyGroup.setPos(corrected_galaxyGroup_pos)
         
         # Correct all subhalo positions
         for subhalo in galaxyGroup.getSubhalos():
@@ -914,10 +853,33 @@ class ListGalaxyGroup:
                 corrected_position[dim] = rel_pos
             subhalo.setPosition(corrected_position)
         
+        galaxyGroup.getCentralSubhalo().setPosition(corrected_central_pos)
+        
         return galaxyGroup
+    
+    @staticmethod
+    def correctPositionWRTBoxsize(boxsize : float, posStatic : np.ndarray, relPos : np.ndarray):
+        '''
+        Corrects a position with respect to a static position considering periodic boundary conditions.
+        
+        :param boxsize: Size of the simulation box
+        :param posStatic: Static reference position (e.g., central galaxy position)
+        :param relPos: Relative position to be corrected
+        :return: Corrected relative position
+        '''
+        corrected_position = np.zeros(3)
+        for dim in range(3):
+            delta = relPos[dim] - posStatic[dim]
+            if abs(delta) > boxsize / 2:
+                if delta > 0:
+                    delta -= boxsize
+                else:
+                    delta += boxsize
+            corrected_position[dim] = delta
+        return corrected_position
 
     @staticmethod
-    def _serialize_galaxy_group(args):
+    def _serialize_galaxy_group(args : tuple[GalaxyGroup, int]):
         """Helper function to serialize a galaxy group's data for HDF5 writing."""
         galaxyGroup, i = args
         
