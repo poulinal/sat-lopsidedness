@@ -65,5 +65,8 @@ class Subhalo:
     def getRbandMagnitude(self):
         return self.getLuminosities()[5]#[0]
     
+    def getGbandMagnitude(self):
+        return self.getLuminosities()[4]#[0]
+    
     def setPosition(self, newPosition : np.ndarray):
         self.position = newPosition
