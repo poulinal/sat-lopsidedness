@@ -19,14 +19,18 @@ class GalaxyGroup:
     def addSubhalo(self, subhalo : Subhalo):
         self.listSubhalos.append(subhalo)
         self.lenSubhalos += 1
+
+        # print(f"{self.listSubhalos}")
+        # print(f"{self.listSubhalos[0].getStellarMass()}")
         
         # Re-identify central and satellite subhalos
         max_mass = -1
         central_subhalo = None
         satellite_subhalos = []
         for sh in self.listSubhalos:
-            if sh.getMass() > max_mass:
-                max_mass = sh.getMass()
+            # print(sh.getStellarMass())
+            if sh.getStellarMass() > max_mass:
+                max_mass = sh.getStellarMass()
                 central_subhalo = sh
         for sh in self.listSubhalos:
             if sh != central_subhalo:
@@ -74,8 +78,8 @@ class GalaxyGroup:
         central_subhalo = None
         satellite_subhalos = []
         for subhalo in newListSubhalos:
-            if subhalo.getMass() > max_mass:
-                max_mass = subhalo.getMass()
+            if subhalo.getStellarMass() > max_mass:
+                max_mass = subhalo.getStellarMass()
                 central_subhalo = subhalo
         for subhalo in newListSubhalos:
             if subhalo != central_subhalo:
