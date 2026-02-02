@@ -140,6 +140,7 @@ class AstroPlotter:
         return fig, ax
     
     def scatter_plot(self, x: np.ndarray, y: np.ndarray, 
+                    errorBars: Optional[np.ndarray] = None,
                     c: Optional[np.ndarray] = None,
                     ax: Optional[Axes] = None,
                     xlabel: Optional[str] = None,
@@ -156,7 +157,9 @@ class AstroPlotter:
                     vmax: Optional[float] = None,
                     xlim: Optional[Tuple[float, float]] = None,
                     ylim: Optional[Tuple[float, float]] = None,
-                    colorbar: bool = True,
+                    colorbar: bool = False,
+                    label: Optional[str] = None,
+                    include_legend: bool = False,
                     output_filename: Optional[str] = None,
                     grid : bool = False,
                     **kwargs) -> Tuple[Figure, Axes]:
@@ -187,6 +190,7 @@ class AstroPlotter:
             Color scale limits
         colorbar : bool
             Add colorbar
+        include_legend: bool = False,
         **kwargs
             Additional arguments for scatter
             
@@ -198,6 +202,16 @@ class AstroPlotter:
             fig, ax = self.create_figure()
         else:
             fig = ax.figure
+
+        # Validate the `c` parameter
+        if c is not None:
+            try:
+                # Check if `c` is a valid single color
+                mpl.colors.to_rgba(c)
+            except ValueError:
+                # If not, ensure `c` is an array of values
+                if not isinstance(c, (list, np.ndarray)):
+                    raise ValueError("The `c` parameter must be a valid color or an array of values.")
         
         # Handle color normalization
         norm = None
@@ -210,6 +224,9 @@ class AstroPlotter:
         sc = ax.scatter(x, y, c=c, cmap=cmap, alpha=alpha, s=s, 
                        norm=norm, **kwargs)
         
+        if errorBars is not None:
+            ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=sc.get_facecolor()[0], alpha=0.5, capsize=2)
+            
         # Set scales
         if xlog:
             ax.set_xscale('log')
@@ -229,7 +246,9 @@ class AstroPlotter:
             ax.set_ylabel(ylabel)
         if title:
             ax.set_title(title)
-        
+        if label:
+            sc.set_label(label)
+            
         if grid:
             ax.grid(True, which='both', linestyle='--', alpha=0.5)
             
@@ -238,6 +257,9 @@ class AstroPlotter:
             cbar = plt.colorbar(sc, ax=ax, pad=0.02)
             if clabel:
                 cbar.set_label(clabel)
+        
+        if include_legend and label:
+            ax.legend()
         
         if output_filename:
             self.save_figure(fig, output_filename)

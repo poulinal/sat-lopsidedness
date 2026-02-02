@@ -104,7 +104,7 @@ class ListGalaxyGroup:
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
             
-    def compute_all_pairwise_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None, tempSaveDir : str=None) -> list[list[tuple[float, float, float]]]:
+    def compute_all_pairwise_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None, tempSaveDir : str=None, rewrite: bool=False) -> list[list[tuple[float, float, float]]]:
         '''
         Docstring for compute_all_pairwise_polar_differences
         Computes all pairwise polar angle differences (in each plane: XY, YZ, ZX) between satellite galaxies in each galaxy group with resepect to the host galaxy.
@@ -118,6 +118,8 @@ class ListGalaxyGroup:
         '''
         self.list_pairwise_differences = []
         print(f"Total Galaxy Groups to process: {len(self.listGalaxyGroups)} with pairs : {sum([gg.getNumSubhalos() * (gg.getNumSubhalos() - 1) // 2 for gg in self.listGalaxyGroups])}")
+        
+
         
         if parallelize:
             if n_processes is None:
@@ -149,9 +151,9 @@ class ListGalaxyGroup:
                     start_index = int(last_file.split('_')[2].split('.')[0])
                 
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
-                if tempSaveDir is not None and i <= start_index:
+                if rewrite == False and tempSaveDir is not None and i <= start_index:
                     continue  # Skip already processed groups
-                print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+                print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r', flush=True)
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
 
@@ -231,7 +233,7 @@ class ListGalaxyGroup:
             
         return self.list_pairwise_differences
     
-    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_polar_differences
         Computes the probability distribution of polar angle differences between satellite galaxies in each galaxy group with resepect to the host galaxy.
@@ -243,22 +245,24 @@ class ListGalaxyGroup:
         :rtype: tuple[np.ndarray, np.ndarray]
         '''
         if not self.list_pairwise_differences:
-            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir)
+            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir, rewrite=rewrite)
         pairwise_differences_flatten = []
         # for galaxyPairwiseGroup in self.list_pairwise_differences:
         #     for pair in galaxyPairwiseGroup:
         #         pairwise_differences_flatten.extend(pair)  # Unpack the tuple and add each angle difference
         
-        #since already flattened in temp save
+         #since already flattened in temp save
         for galaxyPairwiseGroup in self.list_pairwise_differences:
             pairwise_differences_flatten.extend(galaxyPairwiseGroup)
         # bins = np.arange(0, 180 + bin_size, bin_size)
         print(f"bins: {bins}")
         hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        return bin_centers, hist
+        Numbers_in_bins, _ = np.histogram(pairwise_differences_flatten, bins=bins)
+        errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
+        return bin_centers, hist, errorbars
     
-    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None) -> list[float]:
+    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None, rewrite: bool=False) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
         Computes the Mean Resultant Length (MRL) directionality for each galaxy group.
@@ -308,10 +312,10 @@ class ListGalaxyGroup:
                     start_index = int(last_file.split('_')[2].split('.')[0])
             
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
-                if tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
+                if rewrite == False and tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
                     continue  # Skip already processed groups
                     
-                print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r')
+                print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
                 
                 R_values = ListGalaxyGroup._compute_MRL_for_group(galaxyGroup)
                 
@@ -346,25 +350,30 @@ class ListGalaxyGroup:
             
         return self.MRL_values
             
-    def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05, parallelize: bool=False, n_processes: Optional[int]=None, tempSaveDir: Optional[str]=None) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05, parallelize: bool=False, n_processes: Optional[int]=None, tempSaveDir: Optional[str]=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_MRL_directionality
         Computes the probability distribution of Mean Resultant Length (MRL) directionality for each galaxy group.
-        Returns a tuple containing the bin centers and the corresponding probability densities.
+        Returns a tuple containing the bin centers, the corresponding probability densities, and errorbars based on (for N values in a bin, the error for that bin is sqrt{N}).
         
         :param self: Description
         :param bin_size: Size of the bins for the histogram (default is 0.05)
-        :return: Tuple of (bin_centers, probability_densities)
-        :rtype: tuple[np.ndarray, np.ndarray]
+        :return: Tuple of (bin_centers, probability_densities, errorbars)
+        :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
         '''
         if not self.MRL_values:
-            self.compute_all_MRL_directionality(parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir)
+            self.compute_all_MRL_directionality(parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
         else:
             print("Using pre-computed MRL directionality values.")
         bins = np.arange(0, 1 + bin_size, bin_size)
         hist, bin_edges = np.histogram(self.MRL_values, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        return bin_centers, hist
+        Numbers_in_bins, _ = np.histogram(self.MRL_values, bins=bins)
+        errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
+        # Print how many values are in each bin
+        for i, count in enumerate(Numbers_in_bins):
+            print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
+        return bin_centers, hist, errorbars
         
     def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
@@ -800,16 +809,17 @@ class ListGalaxyGroup:
                 continue
             if M_r_max is not None and (np.isnan(subhalo.getRbandMagnitude()) or subhalo.getRbandMagnitude() >= M_r_max):
                 continue
-            if satWithinR200:
+            if satWithinR200 and subhalo != galaxyGroup.getCentralSubhalo():
                 distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
                 # print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
                 if distance_to_central > galaxyGroup.getRCrit200():
                     continue
                 
-            if redGalaxies or blueGalaxies:
+            if (redGalaxies or blueGalaxies) and subhalo != galaxyGroup.getCentralSubhalo():
                 g_mag = subhalo.getGbandMagnitude()
                 r_mag = subhalo.getRbandMagnitude()
                 if np.isnan(g_mag) or np.isnan(r_mag):
+                    print("WARNING... np.nan")
                     continue  # Skip if magnitudes are not available
                 g_r_color = g_mag - r_mag
                 if redGalaxies and g_r_color < 0.65:
@@ -817,7 +827,7 @@ class ListGalaxyGroup:
                 if blueGalaxies and g_r_color >= 0.65:
                     continue
                 
-            if withinXPercentR200 is not None:
+            if withinXPercentR200 is not None and subhalo != galaxyGroup.getCentralSubhalo():
                 distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
                 r200 = galaxyGroup.getRCrit200()
                 min_radius = withinXPercentR200[0] * r200
