@@ -351,8 +351,12 @@ class AstroPlotter:
                  ylog: bool = False,
                  density: bool = False,
                  cumulative: bool = False,
+                 percentage: bool = False,  # New option for percentage
                  histtype: str = 'step',
                  linewidth: float = 2,
+                 output_filename: Optional[str] = None,
+                 legend: bool = False,
+                 grid: bool = False,
                  **kwargs) -> Tuple[Figure, Axes]:
         """
         Create a histogram.
@@ -377,6 +381,8 @@ class AstroPlotter:
             Normalize to density
         cumulative : bool
             Plot cumulative distribution
+        percentage : bool
+            Normalize to percentage (y-axis as percentage of total)
         histtype : str
             Histogram type
         linewidth : float
@@ -393,9 +399,29 @@ class AstroPlotter:
         else:
             fig = ax.figure
         
-        # Create histogram
-        ax.hist(data, bins=bins, density=density, cumulative=cumulative,
-               histtype=histtype, linewidth=linewidth, label=label, **kwargs)
+        if percentage:
+            hist_values, bin_edges = np.histogram(data, bins=bins)
+            total = sum(hist_values)
+            if total > 0:
+                hist_values = (hist_values / total) * 100
+            # Plot histogram as step
+            ax.plot(
+                bin_edges[:-1], hist_values, drawstyle='steps-post',
+                linewidth=linewidth, label=label, **kwargs
+            )
+        else:
+            # Calculate histogram data
+            hist_values, bin_edges, patches = ax.hist(
+                data, bins=bins, density=False, cumulative=cumulative,
+                histtype=histtype, linewidth=linewidth, label=label, **kwargs
+            )
+
+        if percentage:
+            ylabel_text = 'Percentage (%)'
+        elif density:
+            ylabel_text = 'Density'
+        else:
+            ylabel_text = 'Count'
         
         # Set scales
         if xlog:
@@ -406,18 +432,21 @@ class AstroPlotter:
         # Labels and title
         if xlabel:
             ax.set_xlabel(xlabel)
-        if ylabel:
-            ylabel_text = ylabel
-        else:
-            ylabel_text = 'Density' if density else 'Count'
-        ax.set_ylabel(ylabel_text)
+        ax.set_ylabel(ylabel or ylabel_text)
         if title:
             ax.set_title(title)
         
         # Legend
-        if label:
+        if legend and label:
             ax.legend()
         
+        # Grid
+        if grid:
+            ax.grid(True)
+            
+        if output_filename:
+            self.save_figure(fig, output_filename)
+            
         return fig, ax
     
     def density_map(self, data: np.ndarray,

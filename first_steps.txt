@@ -78,5 +78,6 @@ First step after downloading the appropriate catalogs:
 
 next week
 - maybe think about TNG-clusters
+- still using default luminosities - evnetually switch to dust corrected
 - check plots on distribution of central wrt FoF center for each redshift for groups between 10^13 and 10^14 (to determine tolerances)
 - download data and preform analysis on each redshift

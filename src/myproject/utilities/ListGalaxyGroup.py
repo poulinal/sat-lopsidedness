@@ -837,7 +837,7 @@ class ListGalaxyGroup:
             # If we made it past all filters, add the subhalo
             filtered_subhalos.append(subhalo)
         
-        if len(filtered_subhalos) == 0:
+        if len(filtered_subhalos) <= 1: #since central
             return None
         
         if minNumGalaxies is not None and len(filtered_subhalos) < minNumGalaxies:

@@ -28,10 +28,10 @@ class GalaxyGroup:
         central_subhalo = None
         satellite_subhalos = []
         for sh in self.listSubhalos:
-            # print(sh.getStellarMass())
             if sh.getStellarMass() > max_mass:
                 max_mass = sh.getStellarMass()
                 central_subhalo = sh
+        print(f"adding subhalo with mass: {subhalo.getStellarMass()}; sh stellar mass: {sh.getStellarMass()} with max_mass: {max_mass}, so central mass is: {central_subhalo.getStellarMass()}") if self.getGroupID() == 136 else None
         for sh in self.listSubhalos:
             if sh != central_subhalo:
                 satellite_subhalos.append(sh)
