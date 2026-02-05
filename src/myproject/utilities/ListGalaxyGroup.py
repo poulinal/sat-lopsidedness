@@ -376,7 +376,7 @@ class ListGalaxyGroup:
             print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
         return bin_centers, hist, errorbars
         
-    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
+    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -397,6 +397,7 @@ class ListGalaxyGroup:
         :param minNumGalaxies: Minimum number of satellite galaxies required in a galaxy group to retain it (default is None)
         :param maxNumGalaxies: Maximum number of satellite galaxies allowed in a galaxy group to retain it (default is None)
         :param withinXPercentR200: Tuple specifying the range (min, max) as a fraction of R200 within which to retain satellites (default is None)
+        :param centralIsMostMassive: Whether to retain only subhalos where the central is the most massive (default is None)
         :param parallelize: Whether to parallelize the filtering process (default is False)
         :param n_processes: Number of processes to use if parallelizing (default is None, which uses optimal number)
         '''
@@ -405,7 +406,7 @@ class ListGalaxyGroup:
             
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive)
             for gg in self.listGalaxyGroups
         ]
         total = len(args_list)
@@ -779,13 +780,21 @@ class ListGalaxyGroup:
         from myproject.utilities.GalaxyGroup import GalaxyGroup
         import numpy as np
         
-        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200 = args
+        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive = args
         
         # print(f"masses: {minGGMass, galaxyGroup.getMCrit200()}")
         if minGGMass is not None and galaxyGroup.getMCrit200() <= minGGMass:
             return None
         if maxGGMass is not None and galaxyGroup.getMCrit200() >= maxGGMass:
             return None
+        
+        if centralIsMostMassive is not None:
+            central = galaxyGroup.getCentralSubhalo()
+            most_massive = galaxyGroup.getMostMassiveSubhalo()
+            if centralIsMostMassive and central != most_massive:
+                return None
+            if not centralIsMostMassive and central == most_massive:
+                return None
         
         central_pos = galaxyGroup.getCentralSubhalo().getPosition()
         galaxyGroupCM = galaxyGroup.getPosCM()
