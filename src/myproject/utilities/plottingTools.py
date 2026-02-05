@@ -354,6 +354,7 @@ class AstroPlotter:
                  percentage: bool = False,  # New option for percentage
                  histtype: str = 'step',
                  linewidth: float = 2,
+                 linealpha : float = 1.0,
                  output_filename: Optional[str] = None,
                  legend: bool = False,
                  grid: bool = False,
@@ -407,13 +408,13 @@ class AstroPlotter:
             # Plot histogram as step
             ax.plot(
                 bin_edges[:-1], hist_values, drawstyle='steps-post',
-                linewidth=linewidth, label=label, **kwargs
+                linewidth=linewidth, label=label, alpha=linealpha, **kwargs
             )
         else:
             # Calculate histogram data
             hist_values, bin_edges, patches = ax.hist(
                 data, bins=bins, density=False, cumulative=cumulative,
-                histtype=histtype, linewidth=linewidth, label=label, **kwargs
+                histtype=histtype, linewidth=linewidth, label=label, alpha=linealpha, **kwargs
             )
 
         if percentage:

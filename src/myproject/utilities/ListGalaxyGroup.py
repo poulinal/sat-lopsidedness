@@ -51,12 +51,13 @@ class ListGalaxyGroup:
         Loads the ListGalaxyGroup data from an HDF5 file.
     """
     def __init__(self, listGalaxyGroups : list[GalaxyGroup]=[], headerInformation : dict={}):
-        self.listGalaxyGroups = listGalaxyGroups
+        # self.listGalaxyGroups = listGalaxyGroups
+        # self.lenGalaxyGroups = len(self.listGalaxyGroups)
+        self.setGalaxyGroups(listGalaxyGroups)
         self.headerInformation = headerInformation
         self.list_pairwise_differences : list[list[float]] = []
         self.MRL_values : list[float] = []
 
-        self.lenGalaxyGroups = len(self.listGalaxyGroups)
         
     @classmethod
     def from_hdf5(cls, h5file : h5.File):
@@ -648,7 +649,7 @@ class ListGalaxyGroup:
                 vmaxRadius = sh_grp.attrs['vmaxRadius']
                 luminosities = sh_grp.attrs['luminosities']
                 
-                subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities)
+                subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities, group_pos=pos)
                 galaxyGroup.addSubhalo(subhalo)
         
         return galaxyGroup

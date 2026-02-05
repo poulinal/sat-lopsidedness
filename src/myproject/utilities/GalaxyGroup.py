@@ -15,6 +15,21 @@ class GalaxyGroup:
         self.centralSubhalo = None
     
         self.listSubhalos = self.setSubhaloList(listSubhalos)
+
+    def setSubhaloList(self, newListSubhalos : list[Subhalo]):
+        self.listSubhalos = newListSubhalos
+        self.lenSubhalos = len(newListSubhalos)
+        
+        # Identify central and satellite subhalos
+        central_subhalo = self.getMostCentralSubhalo()
+        satellite_subhalos = []
+        for subhalo in newListSubhalos:
+            if subhalo != central_subhalo:
+                satellite_subhalos.append(subhalo)
+        self.setCentralSubhalo(central_subhalo)
+        self.setSatelliteSubhalos(satellite_subhalos)
+        
+        return newListSubhalos
         
     def addSubhalo(self, subhalo : Subhalo):
         self.listSubhalos.append(subhalo)
@@ -24,14 +39,8 @@ class GalaxyGroup:
         # print(f"{self.listSubhalos[0].getStellarMass()}")
         
         # Re-identify central and satellite subhalos
-        max_mass = -1
-        central_subhalo = None
+        central_subhalo = self.getMostCentralSubhalo()
         satellite_subhalos = []
-        for sh in self.listSubhalos:
-            if sh.getStellarMass() > max_mass:
-                max_mass = sh.getStellarMass()
-                central_subhalo = sh
-        print(f"adding subhalo with mass: {subhalo.getStellarMass()}; sh stellar mass: {sh.getStellarMass()} with max_mass: {max_mass}, so central mass is: {central_subhalo.getStellarMass()}") if self.getGroupID() == 136 else None
         for sh in self.listSubhalos:
             if sh != central_subhalo:
                 satellite_subhalos.append(sh)
@@ -43,6 +52,25 @@ class GalaxyGroup:
     
     def getSubhalos(self) -> list[Subhalo]:
         return self.listSubhalos
+
+    def getMostMassiveSubhalo(self) -> Subhalo:
+        max_mass = -1
+        most_massive_subhalo = None
+        for subhalo in self.listSubhalos:
+            if subhalo.getStellarMass() > max_mass:
+                max_mass = subhalo.getStellarMass()
+                most_massive_subhalo = subhalo
+        return most_massive_subhalo
+    
+    def getMostCentralSubhalo(self) -> Subhalo:
+        min_distance = float('inf')
+        most_central_subhalo = None
+        for subhalo in self.listSubhalos:
+            distance = subhalo.getDistanceToGroupCenter()
+            if distance < min_distance:
+                min_distance = distance
+                most_central_subhalo = subhalo
+        return most_central_subhalo
 
     def getSatelliteSubhalos(self) -> list[Subhalo]:
         # Return only satellite subhalos (exclude central which has pos (0, 0, 0))
@@ -68,26 +96,6 @@ class GalaxyGroup:
     
     def getSubhaloI(self, i):
         return self.listSubhalos[i]
-    
-    def setSubhaloList(self, newListSubhalos : list[Subhalo]):
-        self.listSubhalos = newListSubhalos
-        self.lenSubhalos = len(newListSubhalos)
-        
-        # Identify central (largest subhalo in group) and satellite subhalos
-        max_mass = -1
-        central_subhalo = None
-        satellite_subhalos = []
-        for subhalo in newListSubhalos:
-            if subhalo.getStellarMass() > max_mass:
-                max_mass = subhalo.getStellarMass()
-                central_subhalo = subhalo
-        for subhalo in newListSubhalos:
-            if subhalo != central_subhalo:
-                satellite_subhalos.append(subhalo)
-        self.setCentralSubhalo(central_subhalo)
-        self.setSatelliteSubhalos(satellite_subhalos)
-        
-        return newListSubhalos
     
     def setCentralSubhalo(self, central_subhalo : Subhalo):
         self.centralSubhalo = central_subhalo

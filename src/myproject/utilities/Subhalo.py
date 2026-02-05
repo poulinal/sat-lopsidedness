@@ -4,7 +4,7 @@ import numpy as np
 
 class Subhalo:
 
-    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8]):
+    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8], group_pos : np.ndarray):
         """
         Constructor for Subhalo class.
 
@@ -19,6 +19,7 @@ class Subhalo:
             halfMassRad (float): _Radius enclosing half the mass in kpc_
             vmaxRadius (float): _Radius at which the maximum circular velocity is reached in kpc_
             luminosities (np.ndarray[1,8]): _array with 8 elements corresponding to U, B, V, K, g, r, i, z bands. Units: mag_
+            group_pos (np.ndarray): _position of the parent galaxy group as a numpy array with 3 elements (x, y, z) in kpc_
         """
         self.idx = idx # unique subhalo index
         self.group_id = group_id # ID of the parent galaxy group
@@ -30,6 +31,7 @@ class Subhalo:
         self.halfMassRad = halfMassRad # in kpc
         self.vmaxRadius = vmaxRadius # in kpc
         self.luminosities = luminosities # array with 8 elements corresponding to U, B, V, K, g, r, i, z bands. Units: mag
+        self.distanceToGroupCenter = np.linalg.norm(self.position - group_pos) # in kpc
         
     def getIdx(self):
         return self.idx
@@ -67,6 +69,9 @@ class Subhalo:
     
     def getGbandMagnitude(self):
         return self.getLuminosities()[4]#[0]
+    
+    def getDistanceToGroupCenter(self):
+        return self.distanceToGroupCenter
     
     def setPosition(self, newPosition : np.ndarray):
         self.position = newPosition
