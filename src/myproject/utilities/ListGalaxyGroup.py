@@ -154,14 +154,27 @@ class ListGalaxyGroup:
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
                 if rewrite == False and tempSaveDir is not None and i <= start_index:
                     continue  # Skip already processed groups
-                print(f"Progress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='\r', flush=True)
+                print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='', flush=True)
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
+
+                if type(group_pairwise_differences) != list: #list[tuple[float, float, float]]
+                    print(f"WARNING returning.... {group_pairwise_differences, type(group_pairwise_differences)}")
+                    return
 
                 if tempSaveDir is not None:
                     batch_list_pairwise_differences.append(group_pairwise_differences)
                 else:
-                    self.list_pairwise_differences.append(group_pairwise_differences)
+                    #flatten
+                    flatten_group_pairwise_differences = []
+                    for angle in group_pairwise_differences:
+                        if isinstance(angle, tuple):
+                            flatten_group_pairwise_differences.extend(angle)  # Flatten the tuple
+                        else:
+                            print(f"Warning: Expected a tuple but got {type(angle)}. Appending as is.")
+                            return
+                            # flatten_group_pairwise_differences.append(angle)  # Append the float
+                    self.list_pairwise_differences.append(flatten_group_pairwise_differences)
                 
                 #temp save after every 100 groups
                 if i % 100 == 0 and tempSaveDir is not None:
@@ -234,33 +247,51 @@ class ListGalaxyGroup:
             
         return self.list_pairwise_differences
     
-    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray]:
+    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         '''
         Docstring for compute_probablity_distribution_of_polar_differences
         Computes the probability distribution of polar angle differences between satellite galaxies in each galaxy group with resepect to the host galaxy.
         Returns a tuple containing the bin centers and the corresponding probability densities.
-        
+        Errorbars are given by bootstrap resampling of the pairwise differences.
+
         :param self: Description
         :param bins: Array of bin edges for the histogram (default is np.arange(0, 180 + 5, 5))
-        :return: Tuple of (bin_centers, probability_densities)
-        :rtype: tuple[np.ndarray, np.ndarray]
+        :return: Tuple of (bin_centers, probability_densities, errorbars)
+        :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
         '''
         if not self.list_pairwise_differences:
             self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir, rewrite=rewrite)
         pairwise_differences_flatten = []
-        # for galaxyPairwiseGroup in self.list_pairwise_differences:
-        #     for pair in galaxyPairwiseGroup:
-        #         pairwise_differences_flatten.extend(pair)  # Unpack the tuple and add each angle difference
-        
-         #since already flattened in temp save
+        #check and flatten any tuples
         for galaxyPairwiseGroup in self.list_pairwise_differences:
-            pairwise_differences_flatten.extend(galaxyPairwiseGroup)
+            for pair in galaxyPairwiseGroup:
+                # print(f"pair: {pair, type(pair)}")
+                if isinstance(pair, tuple):
+                    print(f"Warning.... flattening tuple pair: {pair, type(pair)}")
+                    return
+                    pairwise_differences_flatten.extend(pair)
+                else:
+                    pairwise_differences_flatten.append(pair)
         # bins = np.arange(0, 180 + bin_size, bin_size)
-        print(f"bins: {bins}")
+        # print(f"bins: {bins}")
         hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        Numbers_in_bins, _ = np.histogram(pairwise_differences_flatten, bins=bins)
-        errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
+        # Bootstrap resampling for error bars
+        n_bootstrap = 1000
+        bootstrap_histograms = []
+        mean_of_original_hist = np.mean(hist)
+        mean_of_boostrap_means = []
+        # while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+        #     print(f"Bootstrapping... Current std of bootstrap means: {np.std(mean_of_boostrap_means) if mean_of_boostrap_means else 'N/A'} our of {0.05 * mean_of_original_hist}")
+        #     mean_of_boostrap_means = []
+        #     for _ in range(n_bootstrap):
+        #         print (f"Bootstrap iteration {_+1}/{n_bootstrap}", end='\r', flush=True)
+        #         resampled_differences = np.random.choice(pairwise_differences_flatten, size=len(pairwise_differences_flatten), replace=True)
+        #         bootstrap_hist, _ = np.histogram(resampled_differences, bins=bins, density=True)
+        #         bootstrap_histograms.append(bootstrap_hist)
+        #         mean_of_boostrap_means.append(np.mean(bootstrap_hist))
+        # errorbars = np.std(bootstrap_histograms, axis=0)
+        errorbars = np.zeros_like(hist)  # Placeholder for error bars, can be replaced with actual bootstrap results when implemented
         return bin_centers, hist, errorbars
     
     def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None, rewrite: bool=False) -> list[float]:
@@ -355,7 +386,7 @@ class ListGalaxyGroup:
         '''
         Docstring for compute_probablity_distribution_of_MRL_directionality
         Computes the probability distribution of Mean Resultant Length (MRL) directionality for each galaxy group.
-        Returns a tuple containing the bin centers, the corresponding probability densities, and errorbars based on (for N values in a bin, the error for that bin is sqrt{N}).
+        Returns a tuple containing the bin centers, the corresponding probability densities, and errorbars based on boostrapping.
         
         :param self: Description
         :param bin_size: Size of the bins for the histogram (default is 0.05)
@@ -369,11 +400,24 @@ class ListGalaxyGroup:
         bins = np.arange(0, 1 + bin_size, bin_size)
         hist, bin_edges = np.histogram(self.MRL_values, bins=bins, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        Numbers_in_bins, _ = np.histogram(self.MRL_values, bins=bins)
-        errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
+        # Numbers_in_bins, _ = np.histogram(self.MRL_values, bins=bins)
+        # errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
+        # Bootstrap resampling for error bars
+        n_bootstrap = 1000
+        bootstrap_histograms = []
+        mean_of_original_hist = np.mean(hist)
+        mean_of_boostrap_means = []
+        while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+            mean_of_boostrap_means = []
+            for _ in range(n_bootstrap):
+                resampled_MRL_values = np.random.choice(self.MRL_values, size=len(self.MRL_values), replace=True)
+                bootstrap_hist, _ = np.histogram(resampled_MRL_values, bins=bins, density=True)
+                bootstrap_histograms.append(bootstrap_hist)
+                mean_of_boostrap_means.append(np.mean(bootstrap_hist))
+        errorbars = np.std(bootstrap_histograms, axis=0)
         # Print how many values are in each bin
-        for i, count in enumerate(Numbers_in_bins):
-            print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
+        # for i, count in enumerate(Numbers_in_bins):
+        #     print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
         return bin_centers, hist, errorbars
         
     def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
@@ -685,7 +729,7 @@ class ListGalaxyGroup:
         deg = 180.0 / np.pi
         
         for i in range(num_subhalos):
-            print(f"    Processing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}")
+            print(f"\rProcessing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}", end='', flush=True)
             for j in range(i + 1, num_subhalos):
                 # Compute angle differences for each plane (in radians, then convert)
                 # where delta_xy=0 corresponds to the same side and delta_xy=180 corresponds to opposite sides

@@ -44,6 +44,9 @@ class Subhalo:
     
     def getMass(self):
         return self.mass
+
+    def getTotalMass(self):
+        return np.sum(self.mass)
     
     def getStellarMass(self):
         return self.stellarMass

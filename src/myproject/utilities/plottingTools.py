@@ -199,6 +199,7 @@ class AstroPlotter:
         fig, ax
         """
         if ax is None:
+            print("warning ax is none")
             fig, ax = self.create_figure()
         else:
             fig = ax.figure

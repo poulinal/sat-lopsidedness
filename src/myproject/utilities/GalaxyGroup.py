@@ -57,8 +57,8 @@ class GalaxyGroup:
         max_mass = -1
         most_massive_subhalo = None
         for subhalo in self.listSubhalos:
-            if subhalo.getStellarMass() > max_mass:
-                max_mass = subhalo.getStellarMass()
+            if subhalo.getTotalMass() > max_mass:
+                max_mass = subhalo.getTotalMass()
                 most_massive_subhalo = subhalo
         return most_massive_subhalo
     
