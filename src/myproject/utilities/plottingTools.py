@@ -12,6 +12,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import LogNorm, Normalize
 import numpy as np
 from typing import Optional, Tuple, Union, List
+from scipy.interpolate import UnivariateSpline
 
 
 class AstroPlotter:
@@ -162,6 +163,9 @@ class AstroPlotter:
                     include_legend: bool = False,
                     output_filename: Optional[str] = None,
                     grid : bool = False,
+                    overlay_color: Optional[str] = None,  # New parameter for overlay color
+                    spline_curvature: bool = False,
+                    spline_smoothing: Optional[float] = None,  # New parameter for spline smoothing
                     **kwargs) -> Tuple[Figure, Axes]:
         """
         Create a scatter plot.
@@ -205,7 +209,7 @@ class AstroPlotter:
             fig = ax.figure
 
         # Validate the `c` parameter
-        if c is not None:
+        if c is not None and overlay_color is None:
             try:
                 # Check if `c` is a valid single color
                 mpl.colors.to_rgba(c)
@@ -221,9 +225,23 @@ class AstroPlotter:
         elif c is not None:
             norm = Normalize(vmin=vmin, vmax=vmax)
         
+        # Use overlay_color if provided
+        scatter_color = overlay_color if overlay_color else c
+
+        print(alpha)
         # Create scatter plot
-        sc = ax.scatter(x, y, c=c, cmap=cmap, alpha=alpha, s=s, 
+        sc = ax.scatter(x, y, c=scatter_color, cmap=cmap, alpha=alpha, s=s, 
                        norm=norm, **kwargs)
+
+        if spline_curvature:
+            # Sort data by x for spline fitting
+            sort_idx = np.argsort(x)
+            x_sorted = x[sort_idx]
+            y_sorted = y[sort_idx]
+            # Fit spline and plot
+            spline = UnivariateSpline(x_sorted, y_sorted, s=spline_smoothing if spline_smoothing is not None else 5)
+            x_smooth = np.linspace(x_sorted.min(), x_sorted.max(), 300)
+            ax.plot(x_smooth, spline(x_smooth),'k-', alpha=0.5, linewidth=3, c=scatter_color, label=label)
         
         if errorBars is not None:
             ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=sc.get_facecolor()[0], alpha=0.5, capsize=2)
@@ -247,7 +265,7 @@ class AstroPlotter:
             ax.set_ylabel(ylabel)
         if title:
             ax.set_title(title)
-        if label:
+        if label and not spline_curvature:
             sc.set_label(label)
             
         if grid:

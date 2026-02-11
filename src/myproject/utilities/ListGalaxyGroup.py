@@ -419,7 +419,74 @@ class ListGalaxyGroup:
         # for i, count in enumerate(Numbers_in_bins):
         #     print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
         return bin_centers, hist, errorbars
+    
+    @staticmethod
+    def compute_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, bin_size: float = 0.05, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> tuple[np.ndarray, np.ndarray]:
+        '''
+        Docstring for compute_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
         
+        :param self: Description
+        :param num_samples: Description
+        :type num_samples: int
+        :param num_non_centrals: Description
+        :type num_non_centrals: int
+        :param parallelize: Description
+        :type parallelize: bool
+        :param n_processes: Description
+        :type n_processes: Optional[int]
+        :param tempSaveDir: Description
+        :type tempSaveDir: Optional[str]
+        :param rewrite: Description
+        :type rewrite: bool
+        :return: Description
+        :rtype: tuple[ndarray, ndarray, ndarray]
+        '''
+        random_MRL_values = []
+        for _ in range(num_samples):
+            # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
+            #for a given random position, get the xy yz and xz angles
+            # random_angles_xy = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+            # random_angles_yz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+            # random_angles_xz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+
+            rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
+            random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
+            random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
+            random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
+            
+            
+            cos_sum_xy = np.sum(np.cos(random_angles_xy))
+            sin_sum_xy = np.sum(np.sin(random_angles_xy))
+            R_xy = np.sqrt(cos_sum_xy**2 + sin_sum_xy**2) / num_non_centrals
+            
+            cos_sum_yz = np.sum(np.cos(random_angles_yz))
+            sin_sum_yz = np.sum(np.sin(random_angles_yz))
+            R_yz = np.sqrt(cos_sum_yz**2 + sin_sum_yz**2) / num_non_centrals
+            
+            cos_sum_xz = np.sum(np.cos(random_angles_xz))
+            sin_sum_xz = np.sum(np.sin(random_angles_xz))
+            R_xz = np.sqrt(cos_sum_xz**2 + sin_sum_xz**2) / num_non_centrals
+            
+            random_MRL_values.extend([R_xy, R_yz, R_xz])
+            
+        bins = np.arange(0, 1 + bin_size, bin_size)
+        hist, bin_edges = np.histogram(random_MRL_values, bins=bins, density=True)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        # bootstrap_histograms = []
+        # mean_of_original_hist = np.mean(hist)
+        # mean_of_boostrap_means = []
+        # while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+        #     mean_of_boostrap_means = []
+        #     for _ in range(1000):
+        #         resampled_random_MRL_values = np.random.choice(random_MRL_values, size=len(random_MRL_values), replace=True)
+        #         bootstrap_hist, _ = np.histogram(resampled_random_MRL_values, bins=bins, density=True)
+        #         bootstrap_histograms.append(bootstrap_hist)
+        #         mean_of_boostrap_means.append(np.mean(bootstrap_hist))
+        # errorbars = np.std(bootstrap_histograms, axis=0)
+        errorbars = np.sqrt(hist / num_samples)  # Poisson errors normalized to density
+        
+        return hist, bin_centers, errorbars
+
     def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
@@ -774,29 +841,6 @@ class ListGalaxyGroup:
         angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane: arctan2(y, x)
         angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane: arctan2(z, y)
         angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(x, z)
-        
-        # #compute angle based on cosine to avoid issues with arctan2
-        # # r = np.sqrt(rel_pos[:, 0]**2 + rel_pos[:, 1]**2)
-        # r_xy = np.linalg.norm(rel_pos[:, :2], axis=1)  # sqrt(x^2 + y^2) per row
-        # r_yz = np.linalg.norm(rel_pos[:, 1:], axis=1)  # sqrt(y^2 + z^2) per row
-        # r_xz = np.linalg.norm(rel_pos[:, [2, 0]], axis=1)  # sqrt(z^2 + x^2) per row
-
-        # print(f"r_xy: {r_xy}") if id == 0 else None
-        # print(f"r_yz: {r_yz}") if id == 0 else None
-        # print(f"r_xz: {r_xz}") if id == 0 else None
-        # # r = np.linalg.norm(rel_pos, axis=1)  # sqrt(x^2 + y^2 + z^2) per row
-        # cos_theta_xy = abs(rel_pos[:, 0]) / r_xy # cos(theta) = x/r
-        # cos_theta_yz = abs(rel_pos[:, 1]) / r_yz # cos(theta) = y/r
-        # cos_theta_xz = abs(rel_pos[:, 2]) / r_xz # cos(theta) = z/r
-        
-        # angles_xy = np.arccos(cos_theta_xy)
-        # angles_yz = np.arccos(cos_theta_yz)
-        # angles_xz = np.arccos(cos_theta_xz)
-        
-        # #normalize to [0, 2pi]
-        # angles_xy = angles_xy % (2 * np.pi)
-        # angles_yz = angles_yz % (2 * np.pi)
-        # angles_xz = angles_xz % (2 * np.pi)
         
         # Compute MRL for XY plane
         cos_sum_xy = np.sum(np.cos(angles_xy))
