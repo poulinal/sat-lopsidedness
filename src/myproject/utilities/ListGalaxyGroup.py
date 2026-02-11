@@ -1,13 +1,14 @@
 # ADP 2026
 
 from myproject.utilities.Subhalo import Subhalo
-from .GalaxyGroup import GalaxyGroup
+from myproject.utilities.GalaxyGroup import GalaxyGroup
 from .parallelTools import parallel_map, get_optimal_processes
 import h5py as h5
 import numpy as np
 import os
 import pickle
 from typing import Optional
+from __future__ import annotations
 
 class ListGalaxyGroup:
     """
@@ -105,9 +106,9 @@ class ListGalaxyGroup:
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
             
-    def compute_all_pairwise_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None, tempSaveDir : str=None, rewrite: bool=False) -> list[list[tuple[float, float, float]]]:
+    def compute_probablity_distribution_of_polar_differences(self, parallelize : bool=False, n_processes : Optional[int]=None, tempSaveDir : str=None, rewrite: bool=False) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
         '''
-        Docstring for compute_all_pairwise_polar_differences
+        Docstring for compute_probablity_distribution_of_polar_differences
         Computes all pairwise polar angle differences (in each plane: XY, YZ, ZX) between satellite galaxies in each galaxy group with resepect to the host galaxy.
         Returns a list of all pairwise polar angle differences. Indicies go from 0 to 180º. Indicie of 0 means aligned, 180º means anti-aligned. Values correspond to the density/probability of finding satellite galaxies at a given polar angle difference.
         
@@ -244,57 +245,11 @@ class ListGalaxyGroup:
                                 for angle in flattened_data:
                                     group_data.append(angle)
                                 self.list_pairwise_differences.append(group_data)
-            
+        
         return self.list_pairwise_differences
+        
     
-    def compute_probablity_distribution_of_polar_differences(self, bins : np.ndarray =np.arange(0, 180 + 5, 5), parallelize: bool = False, tempSaveDir : str=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        '''
-        Docstring for compute_probablity_distribution_of_polar_differences
-        Computes the probability distribution of polar angle differences between satellite galaxies in each galaxy group with resepect to the host galaxy.
-        Returns a tuple containing the bin centers and the corresponding probability densities.
-        Errorbars are given by bootstrap resampling of the pairwise differences.
-
-        :param self: Description
-        :param bins: Array of bin edges for the histogram (default is np.arange(0, 180 + 5, 5))
-        :return: Tuple of (bin_centers, probability_densities, errorbars)
-        :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
-        '''
-        if not self.list_pairwise_differences:
-            self.compute_all_pairwise_polar_differences(parallelize=parallelize, n_processes=None, tempSaveDir=tempSaveDir, rewrite=rewrite)
-        pairwise_differences_flatten = []
-        #check and flatten any tuples
-        for galaxyPairwiseGroup in self.list_pairwise_differences:
-            for pair in galaxyPairwiseGroup:
-                # print(f"pair: {pair, type(pair)}")
-                if isinstance(pair, tuple):
-                    print(f"Warning.... flattening tuple pair: {pair, type(pair)}")
-                    return
-                    pairwise_differences_flatten.extend(pair)
-                else:
-                    pairwise_differences_flatten.append(pair)
-        # bins = np.arange(0, 180 + bin_size, bin_size)
-        # print(f"bins: {bins}")
-        hist, bin_edges = np.histogram(pairwise_differences_flatten, bins=bins, density=True)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        # Bootstrap resampling for error bars
-        n_bootstrap = 1000
-        bootstrap_histograms = []
-        mean_of_original_hist = np.mean(hist)
-        mean_of_boostrap_means = []
-        # while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
-        #     print(f"Bootstrapping... Current std of bootstrap means: {np.std(mean_of_boostrap_means) if mean_of_boostrap_means else 'N/A'} our of {0.05 * mean_of_original_hist}")
-        #     mean_of_boostrap_means = []
-        #     for _ in range(n_bootstrap):
-        #         print (f"Bootstrap iteration {_+1}/{n_bootstrap}", end='\r', flush=True)
-        #         resampled_differences = np.random.choice(pairwise_differences_flatten, size=len(pairwise_differences_flatten), replace=True)
-        #         bootstrap_hist, _ = np.histogram(resampled_differences, bins=bins, density=True)
-        #         bootstrap_histograms.append(bootstrap_hist)
-        #         mean_of_boostrap_means.append(np.mean(bootstrap_hist))
-        # errorbars = np.std(bootstrap_histograms, axis=0)
-        errorbars = np.zeros_like(hist)  # Placeholder for error bars, can be replaced with actual bootstrap results when implemented
-        return bin_centers, hist, errorbars
-    
-    def compute_all_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None, rewrite: bool=False) -> list[float]:
+    def compute_probablity_distribution_of_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None, rewrite: bool=False) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
         Computes the Mean Resultant Length (MRL) directionality for each galaxy group.
@@ -381,113 +336,22 @@ class ListGalaxyGroup:
                             self.MRL_values.extend(batch_data)
             
         return self.MRL_values
-            
-    def compute_probablity_distribution_of_MRL_directionality(self, bin_size : float=0.05, parallelize: bool=False, n_processes: Optional[int]=None, tempSaveDir: Optional[str]=None, rewrite: bool=False) -> tuple[np.ndarray, np.ndarray]:
-        '''
-        Docstring for compute_probablity_distribution_of_MRL_directionality
-        Computes the probability distribution of Mean Resultant Length (MRL) directionality for each galaxy group.
-        Returns a tuple containing the bin centers, the corresponding probability densities, and errorbars based on boostrapping.
-        
-        :param self: Description
-        :param bin_size: Size of the bins for the histogram (default is 0.05)
-        :return: Tuple of (bin_centers, probability_densities, errorbars)
-        :rtype: tuple[np.ndarray, np.ndarray, np.ndarray]
-        '''
-        if not self.MRL_values:
-            self.compute_all_MRL_directionality(parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
-        else:
-            print("Using pre-computed MRL directionality values.")
-        bins = np.arange(0, 1 + bin_size, bin_size)
-        hist, bin_edges = np.histogram(self.MRL_values, bins=bins, density=True)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        # Numbers_in_bins, _ = np.histogram(self.MRL_values, bins=bins)
-        # errorbars = np.sqrt(Numbers_in_bins) / np.sum(Numbers_in_bins) / (bin_edges[1] - bin_edges[0])  # Poisson errors normalized to density
-        # Bootstrap resampling for error bars
-        n_bootstrap = 1000
-        bootstrap_histograms = []
-        mean_of_original_hist = np.mean(hist)
-        mean_of_boostrap_means = []
-        while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
-            mean_of_boostrap_means = []
-            for _ in range(n_bootstrap):
-                resampled_MRL_values = np.random.choice(self.MRL_values, size=len(self.MRL_values), replace=True)
-                bootstrap_hist, _ = np.histogram(resampled_MRL_values, bins=bins, density=True)
-                bootstrap_histograms.append(bootstrap_hist)
-                mean_of_boostrap_means.append(np.mean(bootstrap_hist))
-        errorbars = np.std(bootstrap_histograms, axis=0)
-        # Print how many values are in each bin
-        # for i, count in enumerate(Numbers_in_bins):
-        #     print(f"Bin {i} ({bin_edges[i]:.2f} to {bin_edges[i+1]:.2f}): {count} values")
-        return bin_centers, hist, errorbars
     
-    @staticmethod
-    def compute_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, bin_size: float = 0.05, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    def compute_MRL_random_distribution_curves_for_LGG(self, num_samples: int = 10000, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> list[float]:
         '''
-        Docstring for compute_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
+        Docstring for compute_MRL_random_distribution_curves_for_LGG. Computes the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
         
         :param self: Description
-        :param num_samples: Description
-        :type num_samples: int
-        :param num_non_centrals: Description
-        :type num_non_centrals: int
-        :param parallelize: Description
-        :type parallelize: bool
-        :param n_processes: Description
-        :type n_processes: Optional[int]
-        :param tempSaveDir: Description
-        :type tempSaveDir: Optional[str]
-        :param rewrite: Description
-        :type rewrite: bool
-        :return: Description
-        :rtype: tuple[ndarray, ndarray, ndarray]
+        :rtype: list[float]
         '''
         random_MRL_values = []
-        for _ in range(num_samples):
-            # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
-            #for a given random position, get the xy yz and xz angles
-            # random_angles_xy = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
-            # random_angles_yz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
-            # random_angles_xz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+        for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
+            print(f"Progress: Processing random MRL distribution for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
+            _, _, _, random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
+            random_MRL_values.append(random_MRL_value)
+        return random_MRL_values
 
-            rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
-            random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
-            random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
-            random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
-            
-            
-            cos_sum_xy = np.sum(np.cos(random_angles_xy))
-            sin_sum_xy = np.sum(np.sin(random_angles_xy))
-            R_xy = np.sqrt(cos_sum_xy**2 + sin_sum_xy**2) / num_non_centrals
-            
-            cos_sum_yz = np.sum(np.cos(random_angles_yz))
-            sin_sum_yz = np.sum(np.sin(random_angles_yz))
-            R_yz = np.sqrt(cos_sum_yz**2 + sin_sum_yz**2) / num_non_centrals
-            
-            cos_sum_xz = np.sum(np.cos(random_angles_xz))
-            sin_sum_xz = np.sum(np.sin(random_angles_xz))
-            R_xz = np.sqrt(cos_sum_xz**2 + sin_sum_xz**2) / num_non_centrals
-            
-            random_MRL_values.extend([R_xy, R_yz, R_xz])
-            
-        bins = np.arange(0, 1 + bin_size, bin_size)
-        hist, bin_edges = np.histogram(random_MRL_values, bins=bins, density=True)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        # bootstrap_histograms = []
-        # mean_of_original_hist = np.mean(hist)
-        # mean_of_boostrap_means = []
-        # while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
-        #     mean_of_boostrap_means = []
-        #     for _ in range(1000):
-        #         resampled_random_MRL_values = np.random.choice(random_MRL_values, size=len(random_MRL_values), replace=True)
-        #         bootstrap_hist, _ = np.histogram(resampled_random_MRL_values, bins=bins, density=True)
-        #         bootstrap_histograms.append(bootstrap_hist)
-        #         mean_of_boostrap_means.append(np.mean(bootstrap_hist))
-        # errorbars = np.std(bootstrap_histograms, axis=0)
-        errorbars = np.sqrt(hist / num_samples)  # Poisson errors normalized to density
-        
-        return hist, bin_centers, errorbars
-
-    def filterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
+    def getFilterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -555,10 +419,10 @@ class ListGalaxyGroup:
             list_filtered_galaxy_groups = [gg for gg in list_filtered_galaxy_groups if gg is not None]
             
         # return self.getAllGalaxyGroups()
-        return list_filtered_galaxy_groups
+        return ListGalaxyGroup(listGalaxyGroups=list_filtered_galaxy_groups, headerInformation=self.headerInformation)
                         
 
-    def correctPositions(self, boxsize : float, parallelize : bool=False, n_processes: Optional[int]=None) -> None:
+    def getCorrectedPositions(self, boxsize : float, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
         '''
         Corrects the positions of subhalos in each galaxy group to account for periodic boundary conditions. 
         Ensure all positions are relative to the central galaxy.
@@ -594,7 +458,8 @@ class ListGalaxyGroup:
                 
         # self.setGalaxyGroups(results)
         # return self.getAllGalaxyGroups()
-        return results
+        # return 
+        return ListGalaxyGroup(listGalaxyGroups=results, headerInformation=self.headerInformation)
        
        
        
@@ -729,12 +594,96 @@ class ListGalaxyGroup:
         self.lenGalaxyGroups = len(self.listGalaxyGroups)
         print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
 
+    @staticmethod
+    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> tuple[np.ndarray, np.ndarray]:
+        '''
+        Docstring for compute_an_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
+        
+        :param self: Description
+        :param num_samples: Description
+        :type num_samples: int
+        :param num_non_centrals: Description
+        :type num_non_centrals: int
+        :param parallelize: Description
+        :type parallelize: bool
+        :param n_processes: Description
+        :type n_processes: Optional[int]
+        :param tempSaveDir: Description
+        :type tempSaveDir: Optional[str]
+        :param rewrite: Description
+        :type rewrite: bool
+        :return: Description
+        :rtype: tuple[ndarray, ndarray, ndarray]
+        '''
+        random_MRL_values = []
+        for _ in range(num_samples):
+            # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
+            #for a given random position, get the xy yz and xz angles
+            # random_angles_xy = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+            # random_angles_yz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+            # random_angles_xz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+
+            rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
+            random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
+            random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
+            random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
+            
+            
+            cos_sum_xy = np.sum(np.cos(random_angles_xy))
+            sin_sum_xy = np.sum(np.sin(random_angles_xy))
+            R_xy = np.sqrt(cos_sum_xy**2 + sin_sum_xy**2) / num_non_centrals
+            
+            cos_sum_yz = np.sum(np.cos(random_angles_yz))
+            sin_sum_yz = np.sum(np.sin(random_angles_yz))
+            R_yz = np.sqrt(cos_sum_yz**2 + sin_sum_yz**2) / num_non_centrals
+            
+            cos_sum_xz = np.sum(np.cos(random_angles_xz))
+            sin_sum_xz = np.sum(np.sin(random_angles_xz))
+            R_xz = np.sqrt(cos_sum_xz**2 + sin_sum_xz**2) / num_non_centrals
+            
+            random_MRL_values.extend([R_xy, R_yz, R_xz])
+            
+        return random_MRL_values
+    
+    @staticmethod
+    def get_histogram_bins(values: list[float], bins: Optional[float] = None, binsize: Optional[float] = None, binLow: Optional[float]=None, binHigh: Optional[float]=None, density: bool = False, errorbarType: str = 'poisson') -> np.ndarray:
+        """Helper function to compute histogram bins for pairwise differences."""
+        import numpy as np
+        bin = None
+        if bins is not None:
+            bin = bins
+        elif binsize is not None and binLow is not None and binHigh is not None:
+            bin = np.arange(binLow, binHigh + binsize, binsize)
+        if bin is None:
+            bin='auto'  # Default to 'auto' if no valid binning parameters provided
+        hist, bin_edges = np.histogram(values, bins=bin, density=True)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        if errorbarType == 'poisson':
+            errorbars = np.sqrt(hist / len(values))  # Poisson errors normalized to density
+        elif errorbarType == 'bootstrap':
+            n_bootstrap = 1000
+            bootstrap_histograms = []
+            mean_of_original_hist = np.mean(hist)
+            mean_of_boostrap_means = []
+            while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+                mean_of_boostrap_means = []
+                for _ in range(n_bootstrap):
+                    resampled_values = np.random.choice(values, size=len(values), replace=True)
+                    bootstrap_hist, _ = np.histogram(resampled_values, bins=bins, density=True)
+                    bootstrap_histograms.append(bootstrap_hist)
+                    mean_of_boostrap_means.append(np.mean(bootstrap_hist))
+            errorbars = np.std(bootstrap_histograms, axis=0)
+        else:
+            raise ValueError("Invalid errorbarType. Choose 'poisson' or 'bootstrap'.")
+        return hist, bin_centers, errorbars
+    
     # Standalone functions for multiprocessing (must be picklable)
     @staticmethod
     def _load_group_from_hdf5(args):
         """Helper function to load a single galaxy group from HDF5 file."""
         import h5py as h5
         from myproject.utilities.Subhalo import Subhalo
+        from myproject.utilities.GalaxyGroup import GalaxyGroup
         
         h5_filename, gg_key = args
         
