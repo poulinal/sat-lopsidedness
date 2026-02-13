@@ -1,5 +1,5 @@
 # ADP 2026
-
+from __future__ import annotations
 from myproject.utilities.Subhalo import Subhalo
 from myproject.utilities.GalaxyGroup import GalaxyGroup
 from .parallelTools import parallel_map, get_optimal_processes
@@ -8,7 +8,6 @@ import numpy as np
 import os
 import pickle
 from typing import Optional
-from __future__ import annotations
 
 class ListGalaxyGroup:
     """
@@ -246,9 +245,16 @@ class ListGalaxyGroup:
                                     group_data.append(angle)
                                 self.list_pairwise_differences.append(group_data)
         
-        return self.list_pairwise_differences
+        flatten_list_pairwise_differences = []
+        for group_data in self.list_pairwise_differences:
+            if isinstance(group_data, list):
+                flatten_list_pairwise_differences.extend(group_data)  # Flatten the list of lists
+            else:
+                print(f"Warning: Expected a list but got {type(group_data)}. Appending as is.")
+                return
+                # flatten_list_pairwise_differences.append(group_data)  # Append the float
+        return flatten_list_pairwise_differences
         
-    
     def compute_probablity_distribution_of_MRL_directionality(self, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir : str=None, rewrite: bool=False) -> list[float]:
         '''
         Docstring for compute_MRL_directionality
@@ -347,7 +353,7 @@ class ListGalaxyGroup:
         random_MRL_values = []
         for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
             print(f"Progress: Processing random MRL distribution for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
-            _, _, _, random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
+            random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
             random_MRL_values.append(random_MRL_value)
         return random_MRL_values
 
@@ -666,10 +672,11 @@ class ListGalaxyGroup:
             mean_of_original_hist = np.mean(hist)
             mean_of_boostrap_means = []
             while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+                print(f"\rBootstrapping... Current std of bootstrap means: {np.std(mean_of_boostrap_means):.4f}, Original mean: {mean_of_original_hist:.4f}", end='', flush=True)
                 mean_of_boostrap_means = []
                 for _ in range(n_bootstrap):
                     resampled_values = np.random.choice(values, size=len(values), replace=True)
-                    bootstrap_hist, _ = np.histogram(resampled_values, bins=bins, density=True)
+                    bootstrap_hist, _ = np.histogram(resampled_values, bins=bin, density=True)
                     bootstrap_histograms.append(bootstrap_hist)
                     mean_of_boostrap_means.append(np.mean(bootstrap_hist))
             errorbars = np.std(bootstrap_histograms, axis=0)

@@ -228,7 +228,6 @@ class AstroPlotter:
         # Use overlay_color if provided
         scatter_color = overlay_color if overlay_color else c
 
-        print(alpha)
         # Create scatter plot
         sc = ax.scatter(x, y, c=scatter_color, cmap=cmap, alpha=alpha, s=s, 
                        norm=norm, **kwargs)
@@ -239,7 +238,7 @@ class AstroPlotter:
             x_sorted = x[sort_idx]
             y_sorted = y[sort_idx]
             # Fit spline and plot
-            spline = UnivariateSpline(x_sorted, y_sorted, s=spline_smoothing if spline_smoothing is not None else 5)
+            spline = UnivariateSpline(x_sorted, y_sorted, k=2, s=spline_smoothing if spline_smoothing is not None else 5)
             x_smooth = np.linspace(x_sorted.min(), x_sorted.max(), 300)
             ax.plot(x_smooth, spline(x_smooth),'k--', alpha=0.5, linewidth=3, c=scatter_color, label=label)
         
