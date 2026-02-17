@@ -34,7 +34,7 @@ class ListGalaxyGroup:
     getListPairwiseDifferences() -> list[list[float]]
         Returns the list of pairwise polar angle differences.
     compute_all_pairwise_polar_differences() -> list[list[float]]
-        Computes all pairwise polar angle differences between satellite galaxies in each galaxy group.
+        Computes all pairwPise polar angle differences between satellite galaxies in each galaxy group.
     compute_probablity_distribution_of_polar_differences(bin_size : float=5.0) -> tuple[np.ndarray, np.ndarray]
         Computes the probability distribution of polar angle differences.
     compute_all_MRL_directionality() -> list[float]
