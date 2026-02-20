@@ -1057,8 +1057,8 @@ class GalaxyAnalysis:
         satellite_number_fig, satellite_number_ax = satellite_number_plotter.create_figure()
         
         for listGalaxyGroup, label in listGG:
-            satellite_numbers = [gg.getNumSubhalos() for gg in listGalaxyGroup.getAllGalaxyGroups()]
-            satellite_number_bins, satellite_number_bin_edges, satellite_number_errorbars = ListGalaxyGroup.get_histogram_bins(satellite_numbers, bins=np.arange(0, 20, 1), errorbarType='poisson')
+            satellite_numbers = len([gg.getSatelliteSubhalos() for gg in listGalaxyGroup.getAllGalaxyGroups()])
+            satellite_number_bins, satellite_number_bin_edges, satellite_number_errorbars = ListGalaxyGroup.get_histogram_bins(satellite_numbers, bins='auto', errorbarType='poisson')
             
             satellite_number_plotter.scatter_plot(
                 satellite_number_bin_edges, 
@@ -1100,7 +1100,7 @@ class GalaxyAnalysis:
             with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt', 'w') as f:
                 f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
                 for gg in listGalaxyGroup.getAllGalaxyGroups():
-                    # print(f"Processing Galaxy Group ID: {gg.getGroupID()}", end='\r', flush=True)
+                    print(f"Processing Galaxy Group ID: {gg.getGroupID()}", end='\r', flush=True)
                     gg_id = gg.getGroupID()
                     num_members = gg.getNumSubhalos()
                     cluster_mass = gg.getMCrit200()
@@ -1110,6 +1110,9 @@ class GalaxyAnalysis:
                         if central_subhalo is not None:
                             print(f"id: {subhalo.getIdx()}")
                             join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
+                            if join_time_info is None:
+                                print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
+                                continue
                             f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
 
     #plot the distribution of joining redshifts for each mass bin

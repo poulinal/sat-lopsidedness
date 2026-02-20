@@ -1,5 +1,8 @@
 from myproject.utilities.iapi_TNG import get
 import os
+import h5py as h5
+import numpy as np
+from requests.exceptions import HTTPError
 
 class JoinTime():
     def __init__(self, sim, snapshot):
@@ -13,17 +16,17 @@ class JoinTime():
         names = [sim['name'] for sim in r['simulations']]
         i = names.index(self.sim)
         sim = get( r['simulations'][i]['url'] )
-        snaps = get( sim['snapshots'] )
+        self.snaps = get( sim['snapshots'] )
 
     #also pulled from join time code
-    def getsub(snapnum,subid):
+    def getsub(self, snapnum,subid):
         #Pull url of a sub
         #subid is the ID back into the subhalo group catalog
         url= f'https://www.tng-project.org/api/{self.sim}/snapshots/'+str(snapnum)+'/subhalos/'+str(subid)+'/'
         sub=get(url)
         return(sub)
 
-    def gettree(subid, fname:str=''):
+    def gettree(self, subid, fname:str=''):
         #pull the z=0 merger tree for a subhlao
         #some subhalos don't have merger trees
         fname = fname+'/sublink_mpb_'+str(subid) if fname != '' else ''
@@ -34,11 +37,11 @@ class JoinTime():
         tree=get(url,fName=fName)
         return(tree)
 
-    def getredshift(snapnum):
+    def getredshift(self, snapnum):
         #convert a snapshot number to a redshift
-        return(snaps[snapnum]['redshift'])
+        return(self.snaps[snapnum]['redshift'])
         
-    def computeJoinTimes(ID,hostID, L, halfbox, fname:str):
+    def computeJoinTimes(self, ID,hostID, L, halfbox, fname:str):
         """
         Use the satellite and host trees to find the joining redshift of a satellite based on when it first approached its z=0 FoF group within 3R200
         Identify the change in satellite parameters since they joined
@@ -46,8 +49,16 @@ class JoinTime():
 
 
         #fetch the merger tree for the satellite
-        mpb1 = gettree(ID, fname)
-        f = h5.File(mpb1,'r')
+        try:
+            mpb1 = self.gettree(ID, fname)
+        except HTTPError as e:
+            print(f'No merger tree for satellite {ID}: {e}')
+            return None
+        try:
+            f = h5.File(mpb1,'r')
+        except Exception as e:
+            print(f'Could not open merger tree file for satellite {ID}: {e}')
+            return None
         #grPos = f['GroupPos'][:]
         subPos = f['SubhaloPos'][:]
         #grR200 = f['Group_R_Crit200'][:]
@@ -59,7 +70,11 @@ class JoinTime():
         
         #fetch the merger tree for the satellite's host
 
-        mpbhost =gettree(hostID, fname)
+        try:
+            mpbhost =self.gettree(hostID, fname)
+        except HTTPError as e:
+            print(f'No merger tree for host {hostID}: {e}')
+            return None
         #print(mpbhost)
         fh = h5.File(mpbhost,'r')
         grPos = fh['GroupPos'][:]
@@ -112,7 +127,7 @@ class JoinTime():
         closeind = np.argmin(distsq)
         closest = np.sqrt(distsq[closeind])
         closest_norm = closest/grR200[closeind]
-        closest_z = getredshift(snapnum[closeind])
+        closest_z = self.getredshift(snapnum[closeind])
         
         if len(wh[0])==0: 
             #in some cases, the satellite has never approached within the required distance
@@ -132,7 +147,7 @@ class JoinTime():
         joinsnap=whinside[minind]
         joinprog = whID[minind]
         #print(joinsnap, snapnum, len(snapnum))
-        joinred = getredshift(joinsnap)
+        joinred = self.getredshift(joinsnap)
         #joinind = 99-joinsnap
         #if joinind == len(snapnum): joinind=-1
         
@@ -177,7 +192,7 @@ class JoinTime():
         L_join = M_all_join*np.sqrt(rel_velsq_join)*np.sqrt(distsq[joinind])
         del_L = L_0-L_join
         
-        print(joinsnap)
+        # print(joinsnap)
         
         s_mass_j = subMasstype[joinind][4]
         

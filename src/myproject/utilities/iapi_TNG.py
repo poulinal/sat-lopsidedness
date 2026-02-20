@@ -31,14 +31,14 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
         print("Check your api key")
     r = requests.get(path, params=params, headers=headers)
     
-    print(f"Response code: {r.status_code}")
+    # print(f"Response code: {r.status_code}")
     # raise exception if response code is not HTTP SUCCESS (200)
     r.raise_for_status()
 
     if r.headers['content-type'] == 'application/json':
         return r.json() # parse json responses automatically
 
-    print(f"Saving data to {fName}")
+    # print(f"Saving data to {fName}")
     dataFile=fName+'.hdf5'
     # Saves to file, currently disabled
     print(r.headers)
@@ -48,7 +48,7 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
             f.write(r.content)
         return dataFile # return the filename string
 
-    print(f"Saving data to {dataFile} where r: {r}")
+    # print(f"Saving data to {dataFile} where r: {r}")
     return r
 
 
