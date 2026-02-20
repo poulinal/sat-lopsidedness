@@ -10,11 +10,11 @@ class GalaxyGroupData:
         self.snapshot = snapshot
         # sim = 'TNG300-1'
         # snapshot = 99
-        snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0'), 40: (1.5, 'z1p5'), 33: (2.0, 'z2p0'), 25: (3.0, 'z3p0')}
-        possible_snapshots = list(snapshot_dic.keys())
+        self.snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0'), 40: (1.5, 'z1p5'), 33: (2.0, 'z2p0'), 25: (3.0, 'z3p0')}
+        possible_snapshots = list(self.snapshot_dic.keys())
         self.TNG300_1_volsize = 302.6 #Mpc
         self.TNG300_1_boxsize = 205 #Mpc/h
-        self.scratchDataDirc = f'/scratch/poulin.al/lopsided/{sim}/{snapshot_dic[snapshot][1]}/data'
+        self.scratchDataDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/data'
         
         # print(os.getenv("API_KEY"))
 
@@ -24,7 +24,7 @@ class GalaxyGroupData:
         r=iapi_TNG.get(baseUrl)
         print("r: ", r)
         #check the properties of the simulation you have selected
-        self.simUrl = baseUrl+sim
+        self.simUrl = baseUrl+self.sim
         print(self.simUrl) 
         self.simdata : dict[str, object] = iapi_TNG.get(self.simUrl)
         print(self.simdata['description'])
@@ -39,7 +39,7 @@ class GalaxyGroupData:
         #convert boxsize to kpc from Mpc/h
         self.TNG300_1_boxsize_kpc = self.TNG300_1_boxsize * 1e3 /self.h #kpc
 
-        self.z = snapshot_dic[snapshot][0] #redshift
+        self.z = self.snapshot_dic[self.snapshot][0] #redshift
         self.a = 1.0 / (1 + self.z)  # scale factor, where z = redshift
         
         self.initializeDataStructures()
@@ -68,14 +68,15 @@ class GalaxyGroupData:
         
     def computeAllData(self):
         for sim in ['TNG300-1']:
-            for snapshot in [99]: #possible_snapshots:
+            for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
                 subhalo_id = None #placeholder since we will be fetching all subhalos
-                self.__init__(sim, snapshot, subhalo_id)
-                self.getSubhaloData(sim, snapshot, subhalo_id)
-                self.getGroupData(sim, snapshot, subhalo_id)
+                self.__init__(sim, snapshot)
+                self.getSubhaloData(sim, snapshot)
+                self.getGroupData(sim, snapshot)
                 list_of_galaxy_groups = self.getListGalaxyGroup()
                 self.correctTheData()
-                self.saveListGalaxyGroup(list_of_galaxy_groups)
+                self.saveListGalaxyGroup()
+                print(f"Finished processing for sim: {sim}, snapshot: {snapshot} of index {i}/{len(self.snapshot_dic.keys())}")
                 
     def getListGalaxyGroup(self):
         headerInformation = {
@@ -113,7 +114,7 @@ class GalaxyGroupData:
             # print(galaxyGroup.getNumSubhalos())
                 
             # print(f"premass : {mass[i]}")
-            subhalo = Subhalo(i, group_id=group_num, flag=self.flag[i], mass=self.mass[i], stellarMass=self.stellar_mass[i], groupNumber=self.subhaloGroupNum[i], position=self.subhaloPos[i], halfMassRad=self.subhaloHalfmassRad[i], vmaxRadius=self.SubhaloVmaxRad[i], luminosities=self.SubhaloStellarPhotometrics[i], group_pos=self.groupPos[group_num]) #create subhalo    
+            subhalo = Subhalo(i, group_id=group_num, flag=self.flag[i], mass=self.mass[i], stellarMass=self.stellar_mass[i], groupNumber=self.subhaloGroupNum[i], position=self.subhaloPos[i], halfMassRad=self.subhaloHalfmassRad[i], vmaxRadius=self.SubhaloVmaxRad[i], luminosities=self.SubhaloStellarPhotometrics[i], luminositiesSDSS = self.SubhaloSDSSStellarPhotometrics[i], group_pos=self.groupPos[group_num]) #create subhalo    
             
             temp_dict_galaxy_groups[group_num].addSubhalo(subhalo) #add subhalo to the appropriate galaxy group
 
@@ -155,8 +156,9 @@ class GalaxyGroupData:
         self.subhaloHalfmassRad = self.getSubhaloHalfMassRadiusData(sim, snapshot)
         self.SubhaloVmaxRad = self.getSubhaloVMaxData(sim, snapshot)
         self.SubhaloStellarPhotometrics = self.getSubhaloLuminosityData(sim, snapshot)
+        self.SubhaloSDSSStellarPhotometrics = self.getSubhaloSDSSLuminosityData(sim, snapshot)
         
-        return self.flag, self.mass, self.stellar_mass, self.subhaloGroupNum, self.subhaloPos, self.subhaloHalfmassRad, self.SubhaloVmaxRad, self.SubhaloStellarPhotometrics
+        return self.flag, self.mass, self.stellar_mass, self.subhaloGroupNum, self.subhaloPos, self.subhaloHalfmassRad, self.SubhaloVmaxRad, self.SubhaloStellarPhotometrics, self.SubhaloSDSSStellarPhotometrics
         
     def getSubhaloFlagData(self, sim, snapshot):
         if not os.path.exists(self.scratchDataDirc + 'catalogs'):
@@ -232,6 +234,18 @@ class GalaxyGroupData:
         rewriteFile=0
         fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloStellarPhotometrics'
             
+            
+        SubhaloStellarPhotometrics = iapi_TNG.getSubhaloField('SubhaloStellarPhotometrics',simulation = sim,fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloStellarPhotometricsDefault',snapshot=snapshot,rewriteFile=0) # Eight bands: U, B, V, K, g, r, i, z, all in mag
+        return SubhaloStellarPhotometrics
+
+    def getSubhaloSDSSLuminosityData(self, sim, snapshot):
+        if not os.path.exists(self.scratchDataDirc + 'catalogs/SubhaloStellarPhotometrics'):
+            os.makedirs(self.scratchDataDirc + 'catalogs/SubhaloStellarPhotometrics')
+            print(f'created directory: {self.scratchDataDirc} "catalogs/SubhaloStellarPhotometrics"')
+
+        rewriteFile=0
+        fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloSDSSStellarPhotometrics'
+            
         if not os.path.exists(fileName+'.hdf5') or rewriteFile==1:
             # "http://www.tng-project.org/api/TNG300-1/files/stellar_photometry.99.hdf5"
             url='http://www.tng-project.org/api/'+sim+'/files/stellar_photometry.'+str(snapshot)+'.hdf5'
@@ -241,13 +255,12 @@ class GalaxyGroupData:
             
         with h5.File(dataFile,'r') as f:
             print(f.keys())
-            SubhaloStellarPhotometrics=f['Subhalo_StellarPhot_p07c_cf00dust_res_conv_ns1_rad30pkpc'][:]
-            print(SubhaloStellarPhotometrics.shape)
+            SubhaloSDSSStellarPhotometrics=f['Subhalo_StellarPhot_p07c_cf00dust_res_conv_ns1_rad30pkpc'][:]
+            print(SubhaloSDSSStellarPhotometrics.shape)
             # print(SubhaloStellarPhotometrics[0:5,:])
             # print(SubhaloVmaxRad.shape)
             
-        SubhaloStellarPhotometrics = iapi_TNG.getSubhaloField('SubhaloStellarPhotometrics',simulation = sim,fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloStellarPhotometricsDefault',snapshot=snapshot,rewriteFile=0) # Eight bands: U, B, V, K, g, r, i, z, all in mag
-        return SubhaloStellarPhotometrics
+        return SubhaloSDSSStellarPhotometrics
         
     def getGroupData(self, sim, snapshot):
         self.groupMCrit200 = self.getGroupMCrit200Data(sim, snapshot)
@@ -277,7 +290,7 @@ class GalaxyGroupData:
         self.maxValidGroupIndex = maxValidGroupIndex
         return groupMCrit200
         
-    def getGroupRCrit200Data(self, sim, snapshot, group_id):
+    def getGroupRCrit200Data(self, sim, snapshot):
         if not os.path.exists(self.scratchDataDirc + 'catalogs/GroupRCrit200'):
             os.makedirs(self.scratchDataDirc + 'catalogs/GroupRCrit200')
             print(f'created directory: {self.scratchDataDirc} "catalogs/GroupRCrit200"')
@@ -289,7 +302,7 @@ class GalaxyGroupData:
         print(groupRCrit200[0])
         return groupRCrit200
         
-    def getGroupCMData(self, sim, snapshot, group_id):
+    def getGroupCMData(self, sim, snapshot):
         if not os.path.exists(self.scratchDataDirc + 'catalogs/GroupCM'):
             os.makedirs(self.scratchDataDirc + 'catalogs/GroupCM')
             print(f'created directory: {self.scratchDataDirc} "catalogs/GroupCM"')
@@ -302,7 +315,7 @@ class GalaxyGroupData:
         # validGroupCM = groupCM[validGroupMassIndexes]
         return groupCM
         
-    def getGroupPosData(self, sim, snapshot, group_id):
+    def getGroupPosData(self, sim, snapshot):
         if not os.path.exists(self.scratchDataDirc + 'catalogs/GroupPos'):
             os.makedirs(self.scratchDataDirc + 'catalogs/GroupPos')
             print(f'created directory: {self.scratchDataDirc} "catalogs/GroupPos"')

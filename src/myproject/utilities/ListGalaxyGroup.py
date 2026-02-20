@@ -558,6 +558,7 @@ class ListGalaxyGroup:
                     sh_grp.attrs['halfMassRad'] = subhalo_data['halfMassRad']
                     sh_grp.attrs['vmaxRadius'] = subhalo_data['vmaxRadius']
                     sh_grp.attrs['luminosities'] = subhalo_data['luminosities']
+                    sh_grp.attrs['luminositiesSDSS'] = subhalo_data['luminositiesSDSS']
             
             print(f"\nCompleted writing {len(serialized_data)} galaxy groups to HDF5.")
                     
@@ -716,8 +717,9 @@ class ListGalaxyGroup:
                 halfMassRad = sh_grp.attrs['halfMassRad']
                 vmaxRadius = sh_grp.attrs['vmaxRadius']
                 luminosities = sh_grp.attrs['luminosities']
+                luminositiesSDSS = sh_grp.attrs['luminositiesSDSS']
                 
-                subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities, group_pos=pos)
+                subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities, luminositiesSDSS, group_pos=pos)
                 galaxyGroup.addSubhalo(subhalo)
         
         return galaxyGroup
@@ -996,7 +998,8 @@ class ListGalaxyGroup:
                 'position': subhalo.getPosition(),
                 'halfMassRad': subhalo.getHalfMassRad(),
                 'vmaxRadius': subhalo.getVmaxRadius(),
-                'luminosities': subhalo.getLuminosities()
+                'luminosities': subhalo.getLuminosities(),
+                'luminositiesSDSS': subhalo.getLuminositiesSDSS()
             }
             group_data['subhalos'].append(subhalo_data)
         

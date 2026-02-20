@@ -4,7 +4,7 @@ import numpy as np
 
 class Subhalo:
 
-    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8], group_pos : np.ndarray):
+    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8], luminositiesSDSS : np.ndarray[1,8], group_pos : np.ndarray):
         """
         Constructor for Subhalo class.
 
@@ -31,6 +31,7 @@ class Subhalo:
         self.halfMassRad = halfMassRad # in kpc
         self.vmaxRadius = vmaxRadius # in kpc
         self.luminosities = luminosities # array with 8 elements corresponding to U, B, V, K, g, r, i, z bands. Units: mag
+        self.luminositiesSDSS = luminositiesSDSS
         self.distanceToGroupCenter = np.linalg.norm(self.position - group_pos) # in kpc
         
     def getIdx(self):
@@ -66,7 +67,10 @@ class Subhalo:
     def getLuminosities(self):
         return self.luminosities # returns array with 8 elements corresponding to U, B, V, K, g, r, i, z bands
         #  the dimension 12 corresponds to twelve different projection directions (i.e. observer view angles), since the dust attenuation mode is view-dependent. In general, one can simply take the first entry for each subhalo, or a random entry for each subhalo
-    
+   
+    def getLuminositiesSDSS(self):
+        return self.luminositiesSDSS
+
     def getRbandMagnitude(self):
         return self.getLuminosities()[5]#[0]
     
