@@ -32,18 +32,20 @@ class GalaxyAnalysis:
 
         
     def computeAllPlots(self):
-        # self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.redVsBluePairwisePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
-        # self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
-        # self.MRLDistributionPlots(self.scratchPlotDirc)
+        self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.redVsBluePairwisePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.centralFoFDistanceOffsets(self.scratchPlotDirc)
+        self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
+        self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
         self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
+
+    def computRedShiftPlots(self):
         self.plot_joining_redshift_for_all_mass_bins(self.scratchPlotDirc)
     
     def setDircs(self):
@@ -1057,7 +1059,7 @@ class GalaxyAnalysis:
         satellite_number_fig, satellite_number_ax = satellite_number_plotter.create_figure()
         
         for listGalaxyGroup, label in listGG:
-            satellite_numbers = len([gg.getSatelliteSubhalos() for gg in listGalaxyGroup.getAllGalaxyGroups()])
+            satellite_numbers = [len(gg.getSatelliteSubhalos()) for gg in listGalaxyGroup.getAllGalaxyGroups()]
             satellite_number_bins, satellite_number_bin_edges, satellite_number_errorbars = ListGalaxyGroup.get_histogram_bins(satellite_numbers, bins='auto', errorbarType='poisson')
             
             satellite_number_plotter.scatter_plot(
@@ -1074,6 +1076,8 @@ class GalaxyAnalysis:
                 grid=True,
             )
         satellite_number_ax.legend()
+        #set ylim min to 0
+        satellite_number_ax.set_ylim(bottom=0)
         satellite_number_plotter.save_figure(satellite_number_fig, self.scratchPlotDirc + f'/satellite_number_distribution_by_mass_bins_{self.sim}.png')
         
     def plot_satellite_number_distribution_for_all_mass_bins(self, plot_dirc : str = None):
@@ -1089,6 +1093,9 @@ class GalaxyAnalysis:
         # h=0.6774 
         joinTime = JoinTime(self.sim, self.snapshot)
 
+        totalSatellites = sum(gg.getNumSubhalos() for listGalaxyGroup, _ in listGG for gg in listGalaxyGroup.getAllGalaxyGroups())
+        processedSatelliteIds = []
+        print(f"Total number of satellites to process: {totalSatellites}")
         #get all join times for each mass group
         for listGalaxyGroup, label in listGG:
             if not rewrite:
@@ -1100,16 +1107,18 @@ class GalaxyAnalysis:
             with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt', 'w') as f:
                 f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
                 for gg in listGalaxyGroup.getAllGalaxyGroups():
-                    print(f"Processing Galaxy Group ID: {gg.getGroupID()}", end='\r', flush=True)
+                    print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
                     gg_id = gg.getGroupID()
                     num_members = gg.getNumSubhalos()
                     cluster_mass = gg.getMCrit200()
                     #get the subhalo ID of the central galaxy, which is the one that joins the host halo
                     central_subhalo : GalaxyGroup = gg.getCentralSubhalo()
-                    for subhalo in gg.getSatelliteSubhalos():
+                    for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
                         if central_subhalo is not None:
-                            print(f"id: {subhalo.getIdx()}")
+                            # print(f"id: {subhalo.getIdx()}")
+                            print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
                             join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
+                            processedSatelliteIds.append(subhalo.getIdx())
                             if join_time_info is None:
                                 print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
                                 continue

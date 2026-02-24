@@ -132,7 +132,7 @@ class JoinTime():
         if len(wh[0])==0: 
             #in some cases, the satellite has never approached within the required distance
             #this shouldn't trigger when satellite joining redshift is defined by SubhaloGrNr
-            print('not within 3')
+            # print('not within 3')
             return(np.nan,sep_z0,sep_norm, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, closest,closest_norm,closest_z, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan)
         
         #find the index at which the satellite joined 
