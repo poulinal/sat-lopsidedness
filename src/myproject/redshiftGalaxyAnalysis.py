@@ -158,14 +158,28 @@ class GalaxyAnalysis:
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_RAW_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.vstack(list_of_galaxy_group.MRL_values)}")
         np.savetxt(output_data_file_MRL, np.vstack(list_of_galaxy_group.MRL_values), header='MRL Directionality')
-        
+    
+    def redVsBlueDistributionPlot(self, list_of_galaxy_groups : ListGalaxyGroup, plot_dirc : str = None):
+        #plot the g-r color distribution for red and blue galaxies in the same plot
+        #fit a Gaussian to the g-r color distribution for red and blue galaxies and find the intersection point of the two Gaussians to use as a threshold for separating red and blue galaxies
+        for galaxy_group in list_of_galaxy_groups:
+            print(f"Processing galaxy group {galaxy_group}")
+            if not galaxy_group.isRed():
+                print(f"Galaxy group {galaxy_group} is not red")
+                continue
+            if not galaxy_group.isBlue():
+                print(f"Galaxy group {galaxy_group} is not blue")
+                continue
+            print(f"Galaxy group {galaxy_group} is both red and blue")
+    
     def redVsBluePairwisePlot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
+        intersectionPoint = self.redVsBlueDistributionPlot(list_of_galaxy_groups=filtered_red_list_of_galaxy_groups, plot_dirc=plot_dirc)
+        
         filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True)
         print(f'Number of galaxy groups with only red satellites: {filtered_red_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
         filtered_blue_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(blueGalaxies=True)
         print(f'Number of galaxy groups with only blue satellites: {filtered_blue_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
-
 
         list_pairwise_polar_differences_red = filtered_red_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_red_{self.plotIdentifier}', rewrite=self.generalRewrite)
         list_pairwise_polar_differences_blue = filtered_blue_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_blue_{self.plotIdentifier}', rewrite=self.generalRewrite)
@@ -876,7 +890,7 @@ class GalaxyAnalysis:
             print(f"len listGG: {len(listGG)}, len MRL_values: {len(MRL_values)}, len random_MRL_values: {len(random_MRL_values)}")
             #include a text box in the plot with the fraction of MRL values that are less than the 99th percentile of random MRL values
             fraction_less_than_99th_percentile = np.sum(np.array(MRL_values) < percentile_99_MRL) / len(MRL_values)
-            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < 99th percentile of random MRL: {fraction_less_than_99th_percentile:.2f}")
+            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < 99th percentile of random MRL: {fraction_less_than_99th_percentile:.2f}", loc='bottom center')
             
             # save into .txt file:
             # In table: galaxy id, num of members, mass of cluster, MRL value of that projection, fraction less than the MRL I measured

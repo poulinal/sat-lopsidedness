@@ -686,7 +686,9 @@ class AstroPlotter:
             'upper left': (0.05, 0.95),
             'lower right': (0.95, 0.05),
             'lower left': (0.05, 0.05),
-            'center': (0.5, 0.5)
+            'center': (0.5, 0.5),
+            'outside upper right': (1.05, 0.95),
+            'bottom center': (0.5, -0.05),
         }
         
         xy = loc_dict.get(loc, (0.95, 0.95))

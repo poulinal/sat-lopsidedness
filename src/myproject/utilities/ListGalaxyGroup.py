@@ -357,7 +357,7 @@ class ListGalaxyGroup:
             random_MRL_values.append(random_MRL_value)
         return random_MRL_values
 
-    def getFilterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
+    def getFilterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, redBluePoint: float=0.65, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -375,6 +375,7 @@ class ListGalaxyGroup:
         :param satWithinR200: Whether to retain only satellites within R200 (default is False)
         :param redGalaxies: Whether to retain only red galaxies via (g-r) ≥ 0.65 @ z=0 (default is False)
         :param blueGalaxies: Whether to retain only blue galaxies via (g-r) < 0.65 @ z=0 (default is False)
+        :param redBluePoint: The (g-r) color cut point to use for separating red and blue galaxies if redGalaxies or blueGalaxies is True (default is None, which uses 0.65)
         :param minNumGalaxies: Minimum number of satellite galaxies required in a galaxy group to retain it (default is None)
         :param maxNumGalaxies: Maximum number of satellite galaxies allowed in a galaxy group to retain it (default is None)
         :param withinXPercentR200: Tuple specifying the range (min, max) as a fraction of R200 within which to retain satellites (default is None)
@@ -387,7 +388,7 @@ class ListGalaxyGroup:
             
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive)
             for gg in self.listGalaxyGroups
         ]
         total = len(args_list)
@@ -820,13 +821,13 @@ class ListGalaxyGroup:
         return [R_xy, R_yz, R_xz]
 
     @staticmethod
-    def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float, bool, bool, bool, int, int, tuple[float, float]]):
+    def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float,float, bool, bool, bool, float, int, int, tuple[float, float]]):
         """Helper function to filter subhalos for a single galaxy group."""
         from myproject.utilities.Subhalo import Subhalo
         from myproject.utilities.GalaxyGroup import GalaxyGroup
         import numpy as np
         
-        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive = args
+        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, satWithinR200, redGalaxies, blueGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive = args
         
         # print(f"masses: {minGGMass, galaxyGroup.getMCrit200()}")
         if minGGMass is not None and galaxyGroup.getMCrit200() <= minGGMass:
@@ -878,9 +879,9 @@ class ListGalaxyGroup:
                     print("WARNING... np.nan")
                     continue  # Skip if magnitudes are not available
                 g_r_color = g_mag - r_mag
-                if redGalaxies and g_r_color < 0.65:
+                if redGalaxies and g_r_color < redBluePoint:
                     continue
-                if blueGalaxies and g_r_color >= 0.65:
+                if blueGalaxies and g_r_color >= redBluePoint:
                     continue
                 
             if withinXPercentR200 is not None and subhalo != galaxyGroup.getCentralSubhalo():
