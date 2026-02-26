@@ -121,9 +121,13 @@ class GalaxyAnalysis:
             grid=True,
         )
         
-        # save bin centers and probabilities to text file
+        # save bin centers and probabilities, errorbars to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar/pairwise_polar_difference_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers, pairwise_polar_differences_binned)), header='Pairwise Polar Difference (degrees)    Probability Density')
+        np.savetxt(output_data_file, np.column_stack((polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density    Errorbars')
+        
+        #save raw pairwise polar differences to text file
+        output_data_file = self.scratchDataDirc + f'/pairwise_polar/pairwise_polar_difference_RAW_{self.plotIdentifier}.txt'
+        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences)), header='Pairwise Polar Difference (degrees)')
         
         return prob_polar_plotter, polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars
         
@@ -148,7 +152,7 @@ class GalaxyAnalysis:
         #save bin centers and probabilities to text file
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.column_stack((MRL_bin_centers, MRL_directionality))}")
-        np.savetxt(output_data_file_MRL, np.column_stack((MRL_bin_centers, MRL_directionality)), header='MRL Directionality    Probability Density')
+        np.savetxt(output_data_file_MRL, np.column_stack((MRL_bin_centers, MRL_directionality, MRL_errorbars)), header='MRL Directionality    Probability Density    Errorbars')
         
         #save bin MRL values to text file
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_RAW_{self.plotIdentifier}.txt'
@@ -168,7 +172,7 @@ class GalaxyAnalysis:
         
         pairwise_polar_differences_red, polar_bin_centers_red, pairwise_polar_red_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_red, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
         pairwise_polar_differences_blue, polar_bin_centers_blue, pairwise_polar_blue_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_blue, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-        
+
         print('Computed pairwise polar differences between red and blue satellite galaxies.')
         prob_polar_red_blue_plotter = AstroPlotter()
         prob_polar_red_blue_fig, prob_polar_red_blue_ax = prob_polar_red_blue_plotter.create_figure()
@@ -204,8 +208,11 @@ class GalaxyAnalysis:
         
         # save as txt file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_color/pairwise_polar_color_difference_{self.plotIdentifier}.txt'
-        print(f"data to be saved: {np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_differences_blue))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_differences_blue)), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Probability Density (Blue)')
+        print(f"data to be saved: {np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars))}")
+        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Error Bar (Red)    Probability Density (Blue)    Error Bar (Blue)')
+        #save raw pairwise polar differences to text file
+        output_data_file = self.scratchDataDirc + f'/pairwise_polar_color/pairwise_polar_color_difference_RAW_{self.plotIdentifier}.txt'
+        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_red, list_pairwise_polar_differences_blue)), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
         
     def member150v50Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_GT150_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(minNumGalaxies=150)
@@ -253,7 +260,10 @@ class GalaxyAnalysis:
         # save as text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_memberNum/pairwise_polar_memberNum_difference_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.column_stack((polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_differences_GT150))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_differences_GT150)), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Probability Density (>150 Satellites)')
+        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT50, pairwise_polar_differences_LT50,  pairwise_polar_LT50_errorbars, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Error Bar (<50 Satellites)    Probability Density (>150 Satellites)    Error Bar (>150 Satellites)')
+        #save raw pairwise polar differences to text file
+        output_data_file = self.scratchDataDirc + f'/pairwise_polar_memberNum/pairwise_polar_memberNum_difference_RAW_{self.plotIdentifier}.txt'
+        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_LT50, list_pairwise_polar_differences_GT150)), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
 
     def memberL35vG65Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_LT35R200_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0,0.35])
@@ -264,7 +274,7 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences_LT35R200 = filtered_LT35R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_radius/pairwise_polar_LT35R200_{self.plotIdentifier}', rewrite=self.generalRewrite)
         list_pairwise_polar_differences_GT65R200 = filtered_GT65R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_radius/pairwise_polar_GT65R200_{self.plotIdentifier}', rewrite=self.generalRewrite)
         
-        pairwise_polar_differences_LT35R200, polar_bin_centers_LT35R200, pairwise_polar__LT35R400_errorbars = filtered_LT35R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_LT35R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_LT35R200, polar_bin_centers_LT35R200, pairwise_polar_LT35R200_errorbars = filtered_LT35R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_LT35R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
         pairwise_polar_differences_GT65R200, polar_bin_centers_GT65R200, pairwise_polar_GT65R200_errorbars = filtered_GT65R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_GT65R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
         
         prob_polar_LT35R200_GT65R200_plotter = AstroPlotter()
@@ -272,7 +282,7 @@ class GalaxyAnalysis:
         prob_polar_LT35R200_GT65R200_plotter.scatter_plot(
             polar_bin_centers_LT35R200, 
             pairwise_polar_differences_LT35R200,
-            errorBars = pairwise_polar__LT35R400_errorbars,
+            errorBars = pairwise_polar_LT35R200_errorbars,
             ax=prob_polar_LT35R200_GT65R200_ax, # Use the same axis for overlay
             xlabel='Pairwise Polar Difference (degrees)',
             ylabel='Probability Density',
@@ -297,10 +307,13 @@ class GalaxyAnalysis:
             grid=True,
         )
         
-        # save as text file
+        #save bin centers and probabilities and errorbars to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_radius/pairwise_polar_radius_difference_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.column_stack((polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_differences_GT65R200))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_differences_GT65R200)), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Probability Density (65-100% R200)')
+        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Error Bar (<35% R200)    Probability Density (65-100% R200)    Error Bar (65-100% R200)')
+        #save raw pairwise polar differences to text file
+        output_data_file = self.scratchDataDirc + f'/pairwise_polar_radius/pairwise_polar_radius_difference_RAW_{self.plotIdentifier}.txt'
+        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_LT35R200, list_pairwise_polar_differences_GT65R200)), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
     
     def getCentral_FoF_distanceOffset(self, list_of_galaxy_groups : ListGalaxyGroup):
         distanceOffsets = []
@@ -866,6 +879,17 @@ class GalaxyAnalysis:
                     MRL_value = [MRL_values[k * 3], MRL_values[k * 3 + 1], MRL_values[k * 3 + 2]] if k * 3 + 2 < len(MRL_values) else [0, 0, 0]
                     if np.any(np.array(MRL_value) > 0.8):
                         f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{MRL_value}\n")
+                        
+            #save bin centers and probabilities and errorbars to text file
+            with open(self.scratchPlotDirc + f'/MRL_distribution_curves_{label}_{self.plotIdentifier}.txt', 'w') as f:
+                f.write("MRLBinCenter\tMRLProbability\tMRLErrorBar\tRandomMRLBinCenter\tRandomMRLProbability\tRandomMRLErrorBar\n")
+                for m, (mrl_bin_center, mrl_prob, mrl_errorbar, random_mrl_bin_center, random_mrl_prob, random_mrl_errorbar) in enumerate(zip(MRL_bin_centers, MRL_binned, MRL_errorbars, random_MRL_bin_centers, random_MRL_bins, random_MRL_errorbars)):
+                    f.write(f"{mrl_bin_center}\t{mrl_prob}\t{mrl_errorbar}\t{random_mrl_bin_center}\t{random_mrl_prob}\t{random_mrl_errorbar}\n")
+            #save raw MRL values and random MRL values to text file
+            with open(self.scratchPlotDirc + f'/MRL_raw_values_{label}_{self.plotIdentifier}.txt', 'w') as f:
+                f.write("MRLValue\tRandomMRLValue\n")
+                for n, (mrl_value, random_mrl_value) in enumerate(zip(MRL_values, random_MRL_values)):
+                    f.write(f"{mrl_value}\t{random_mrl_value}\n")
         # overlayAxToPlot.legend()
         overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png')
         
@@ -1075,6 +1099,11 @@ class GalaxyAnalysis:
         #write into file
         with open(self.scratchPlotDirc + f'/high_MRL_2satellite_percentage_{self.sim}.txt', 'w') as f:
             f.write(f"Percentage of High MRL Galaxy Groups with Only 2 Satellites: {high_MRL_2satellite_percentage:.2f}% ({high_MRL_2satellite_count} out of {high_MRL_total_count})\n")
+        #save bin centers and probabilities and errorbars to text file
+        with open(self.scratchPlotDirc + f'/high_MRL_pairwise_polar_distribution_{self.sim}.txt', 'w') as f:
+            f.write("PolarBinCenter\tPolarProbability\tPolarErrorBar\n")
+            for m, (polar_bin_center, polar_prob, polar_errorbar) in enumerate(zip(high_MRL_pairwise_polar_bin_centers, high_MRL_pairwise_polar_bins, high_MRL_pairwise_polar_errorbars)):
+                f.write(f"{polar_bin_center}\t{polar_prob}\t{polar_errorbar}\n")
 
     # for each mass bin, get the probability a galaxy group has some number of satellites
     def plot_satellite_number_distribution_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]]):
