@@ -673,7 +673,7 @@ class ListGalaxyGroup:
             bootstrap_histograms = []
             mean_of_original_hist = np.mean(hist)
             mean_of_boostrap_means = []
-            while mean_of_boostrap_means == [] or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
+            while mean_of_boostrap_means == []: #or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
                 print(f"\rBootstrapping... Current std of bootstrap means: {np.std(mean_of_boostrap_means):.4f}, Original mean: {mean_of_original_hist:.4f}", end='', flush=True)
                 mean_of_boostrap_means = []
                 for _ in range(n_bootstrap):
