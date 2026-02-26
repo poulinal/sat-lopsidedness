@@ -15,6 +15,8 @@ class SnapshotEnum(Enum):
     SNAPSHOT_33 = (33, 2.0, 'z2p0')
     SNAPSHOT_25 = (25, 3.0, 'z3p0')
     
+    def getAllSnapshots():
+        return [snapshot.value for snapshot in SnapshotEnum]
     
         
     

@@ -206,6 +206,10 @@ class AstroPlotter:
             print("warning ax is none")
             fig, ax = self.create_figure()
         else:
+            # If ax is a numpy array (from subplots), select the first axes
+            if isinstance(ax, np.ndarray):
+                print("Warning: ax is a numpy array, using the first axes in the array.")
+                ax = ax.flat[0]
             fig = ax.figure
 
         # Validate the `c` parameter

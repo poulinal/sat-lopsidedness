@@ -45,7 +45,7 @@ class GalaxyAnalysis:
         self.HighMRLPlots(self.scratchPlotDirc)
         self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
 
-    def computRedShiftPlots(self):
+    def computeRedShiftPlots(self):
         self.plot_joining_redshift_for_all_mass_bins(self.scratchPlotDirc)
     
     def setDircs(self):
@@ -62,6 +62,15 @@ class GalaxyAnalysis:
         print(f'Loaded galaxy data from {data_file}')
         # print(f"len filtered: {len(filtered_galaxy_groups)}")
         self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14)
+        return self.loaded_list_of_galaxy_groups
+    
+    def load_galaxy_groups_for_snapshot_sim(self, snapshot:int, sim:str):
+        scratchDataDirc = f'/scratch/poulin.al/lopsided/{sim}/{self.snapshot_dic[snapshot][1]}/data'
+        data_file = scratchDataDirc + f'/galaxy_data_{sim}.hdf5'
+        with h5.File(data_file, 'r') as f:
+            list_of_galaxy_groups = ListGalaxyGroup.from_hdf5(f)
+        print(f'Loaded galaxy data for snapshot {snapshot} from {data_file}')
+        return list_of_galaxy_groups
         
     def setGeneralRewrite(self, rewrite : bool):
         self.generalRewrite = rewrite
@@ -72,7 +81,9 @@ class GalaxyAnalysis:
         self.load_galaxy_groups()
         self.initializeMassSubgroups()
 
-    def initializeMassSubgroups(self):
+    def initializeMassSubgroups(self, list_of_galaxy_groups : ListGalaxyGroup = None):
+        if list_of_galaxy_groups is not None:
+            self.loaded_list_of_galaxy_groups = list_of_galaxy_groups
         #filter to groups with stellar mass 10^{13} < $M_{{200}}$ < 10^{13.5} Msun
         self.filtered_gt13_ls13p5_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=5e13, minGGMass=1e13)
 
@@ -87,6 +98,8 @@ class GalaxyAnalysis:
 
         #filter to groups with stellar mass $M_{{200}}$ > 10^{15} Msun
         self.filtered_gt15_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e15)
+        
+        return self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups
         
     def pairwisePolarDifferencePlot(self, list_of_galaxy_group : ListGalaxyGroup, plot_dirc : str = None):
         list_pairwise_polar_differences = list_of_galaxy_group.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_{self.plotIdentifier}', rewrite=self.generalRewrite)
@@ -760,11 +773,17 @@ class GalaxyAnalysis:
 
         for i, (listGalaxyGroup, label) in enumerate(listGG):
             MRL_values = listGalaxyGroup.compute_probablity_distribution_of_MRL_directionality(parallelize=False)
+            if not MRL_values or len(MRL_values) == 0:
+                print(f"Skipping {label}: No MRL values to plot.")
+                continue
             MRL_binned, MRL_bin_centers, MRL_errorbars = ListGalaxyGroup.get_histogram_bins(MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson')
-            
+
             random_MRL_values = listGalaxyGroup.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=numsamples)
+            if not random_MRL_values or len(random_MRL_values) == 0:
+                print(f"Skipping {label}: No random MRL values to plot.")
+                continue
             random_MRL_bins, random_MRL_bin_centers, random_MRL_errorbars = ListGalaxyGroup.get_histogram_bins(random_MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson')
-            
+
             if len(listGG) > 1:
                 print(f"choosing ax, {i}")
                 overlayAxToPlot = overlayMRLAx[i]
@@ -784,7 +803,7 @@ class GalaxyAnalysis:
             #plot a small verticle line at 99th percentile of radnom MRL_values
             percentile_99_MRL = np.percentile(random_MRL_values, 99)
             # overlayMRLAx.axvline(percentile_99_MRL, linestyle='--', label=f'99th Percentile')
-            
+
             overlayMRLPlotter.scatter_plot(
                 random_MRL_bin_centers, 
                 random_MRL_bins,
@@ -855,7 +874,11 @@ class GalaxyAnalysis:
             f.write(f"Simulation: {self.sim}\n")
             f.write("GalaxyGroupID\tNumMembers\tClusterMass\tMRLValue\tFractionLessThanMRL\n")
             for l, (listGalaxyGroup, label) in enumerate(listGG):
-                with open(self.scratchPlotDirc + f'/MRL_values_and_random_comparison_{label}_{self.plotIdentifier}.txt', 'r') as g:
+                comparison_file = self.scratchPlotDirc + f'/MRL_values_and_random_comparison_{label}_{self.plotIdentifier}.txt'
+                if not os.path.exists(comparison_file):
+                    print(f"Skipping missing file: {comparison_file}")
+                    continue
+                with open(comparison_file, 'r') as g:
                     lines = g.readlines()
                     for line in lines[1:]:  # Skip header line
                         f.write(line)
@@ -1096,6 +1119,24 @@ class GalaxyAnalysis:
         totalSatellites = sum(gg.getNumSubhalos() for listGalaxyGroup, _ in listGG for gg in listGalaxyGroup.getAllGalaxyGroups())
         processedSatelliteIds = []
         print(f"Total number of satellites to process: {totalSatellites}")
+        
+        satellitesWihtoutMergerTree = []
+        #load satellitesWihtoutMergerTree from file if exists
+        # if not rewrite:
+        if os.path.exists(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
+            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'r') as f:
+                lines = f.readlines()
+                for line in lines[1:]:  # Skip header line
+                    parts = line.split('\t')
+                    if len(parts) > 0:
+                        satellitesWihtoutMergerTree.append(int(parts[0]))
+            print(f"Loaded {len(satellitesWihtoutMergerTree)} satellites without merger tree from file.")
+        else:
+            print("No existing file for satellites without merger tree found, starting with an empty list.")
+            #prep the file with header
+            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
+                f.write("SatelliteSubhaloID\n")
+        
         #get all join times for each mass group
         for listGalaxyGroup, label in listGG:
             if not rewrite:
@@ -1107,7 +1148,7 @@ class GalaxyAnalysis:
             with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt', 'w') as f:
                 f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
                 for gg in listGalaxyGroup.getAllGalaxyGroups():
-                    print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
+                    # print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
                     gg_id = gg.getGroupID()
                     num_members = gg.getNumSubhalos()
                     cluster_mass = gg.getMCrit200()
@@ -1116,13 +1157,22 @@ class GalaxyAnalysis:
                     for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
                         if central_subhalo is not None:
                             # print(f"id: {subhalo.getIdx()}")
+                            #check if satellite has no merger tree
+                            if subhalo.getIdx() in satellitesWihtoutMergerTree:
+                                print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
+                                continue
                             print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
                             join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
                             processedSatelliteIds.append(subhalo.getIdx())
                             if join_time_info is None:
                                 print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
+                                satellitesWihtoutMergerTree.append(subhalo.getIdx())
+                                #write into file
+                                with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'a') as g:
+                                    g.write(f"{subhalo.getIdx()}\n")
                                 continue
                             f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
+        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}")
 
     #plot the distribution of joining redshifts for each mass bin
     def plot_joining_redshift_distribution_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]]):
@@ -1167,3 +1217,73 @@ class GalaxyAnalysis:
         # self.get_satellite_join_time(list_of_mass_bin_galaxy_groups)
 
         self.plot_joining_redshift_distribution_by_mass_bins(list_of_mass_bin_galaxy_groups)
+        
+    def overlay_polar_pairwise_across_redshifts(self, listRedshiftGG:list[list[tuple[ListGalaxyGroup, str]]], plot_dirc:str = None, polar_plotter=None, polar_fig=None, polar_ax=None, mrlOrPolar:str = 'polar', plotRows:int = 0, plotCols:int = 0):
+        if polar_plotter is None:
+            polar_plotter = AstroPlotter()
+        if polar_fig is None or polar_ax is None:
+            polar_fig, polar_ax = polar_plotter.create_figure(ncols=1, nrows=len(listRedshiftGG[0]), figsize=(8, 6*len(listRedshiftGG[0]))) if plotRows == 0 or plotCols == 0 else polar_plotter.create_figure(ncols=plotCols, nrows=plotRows, figsize=(8*plotCols, 6*plotRows))
+        
+        for redshift_index, listGG in enumerate(listRedshiftGG):
+            for i, (listGalaxyGroup, label) in enumerate(listGG):
+                print(f"COMPUTING FOR redshift index: {redshift_index}, label: {label}")
+                if mrlOrPolar == 'mrl':
+                    pairwise_polar_differences = listGalaxyGroup.compute_mrl_distribution_of_polar_differences(parallelize=False)
+                else:
+                    pairwise_polar_differences = listGalaxyGroup.compute_probablity_distribution_of_polar_differences(parallelize=False)
+                    pairwise_polar_bins, pairwise_polar_bin_centers, pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(pairwise_polar_differences, bins=np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+                xlabel = 'Pairwise Polar Difference (degrees)' if mrlOrPolar == 'polar' else 'MRL Directionality of Pairwise Polar Difference'
+                ylabel = 'Probability Density' if mrlOrPolar == 'polar' else 'Probability Density of MRL Directionality'
+                title = f'Pairwise Polar Difference Distribution for {self.sim} Galaxy Groups in {label}' if mrlOrPolar == 'polar' else f'MRL Directionality of Pairwise Polar Difference for {self.sim} Galaxy Groups in {label}'
+                
+                if len(listGG) > 1:
+                    print(f"choosing ax, {i}")
+                    polar_ax_to_plot = polar_ax[i]
+                else:
+                    polar_ax_to_plot = polar_ax
+
+                polar_plotter.scatter_plot(
+                    pairwise_polar_bin_centers, 
+                    pairwise_polar_bins,
+                    errorBars = pairwise_polar_errorbars,
+                    ax=polar_ax_to_plot, # Use the same axis for overlay
+                    xlabel=xlabel,
+                    ylabel=ylabel,
+                    title=title,
+                    # ylim = (0, 0.01),
+                    label=f"{label}",
+                    output_filename=None,
+                    grid=True,
+                )
+        # if len(listGG) == 1:
+        #     polar_ax.legend()
+        # else:
+        #     for ax in polar_ax:
+        #         ax.legend()
+        # polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')
+        return polar_plotter, polar_fig, polar_ax
+        
+    def plot_pairwise_polar_difference_across_redshifts(self, plot_dirc:str = None):
+        listRedshiftGG: list[list[tuple[ListGalaxyGroup, str]]] = []
+        for snapshot_index, snapshot in enumerate(self.snapshot_dic.keys()):
+            print(f"GATHERING FOR SNAPSHOT: {snapshot}")
+            list_galaxy_group = self.load_galaxy_groups_for_snapshot_sim(snapshot, self.sim)
+            list_galaxy_group_gt13_ls13p5, list_galaxy_group_gt13p5_ls14, list_galaxy_group_gt14_ls14p5, list_galaxy_group_gt14p5_ls15, list_galaxy_group_gt15 = self.initializeMassSubgroups(list_galaxy_group)
+            group_list = []
+            group_list.append((list_galaxy_group_gt13_ls13p5, f'$13<M_{{200}}<13.5$, z={self.snapshot_dic[snapshot][1]}'))
+            group_list.append((list_galaxy_group_gt13p5_ls14, f'$13.5<M_{{200}}<14$, z={self.snapshot_dic[snapshot][1]}'))
+            group_list.append((list_galaxy_group_gt14_ls14p5, f'$14<M_{{200}}<14.5$, z={self.snapshot_dic[snapshot][1]}'))
+            group_list.append((list_galaxy_group_gt14p5_ls15, f'$14.5<M_{{200}}<15$, z={self.snapshot_dic[snapshot][1]}'))
+            group_list.append((list_galaxy_group_gt15, f'$M_{{200}}>15$, z={self.snapshot_dic[snapshot][1]}'))
+            group_list.append((list_galaxy_group, f'All Masses, z={self.snapshot_dic[snapshot][1]}'))
+            listRedshiftGG.append(group_list)
+
+        polar_plotter, polar_fig, polar_ax = self.overlay_polar_pairwise_across_redshifts(listRedshiftGG, plot_dirc=plot_dirc, mrlOrPolar='polar', plotRows=2, plotCols=3)
+        return polar_plotter, polar_fig, polar_ax
+        polar_ax[-1].legend(loc='upper right')  # Add legend to the last subplot
+        polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')
+        
+        mrl_plotter, mrl_fig, mrl_ax = self.overlay_polar_pairwise_across_redshifts(listRedshiftGG, plot_dirc=plot_dirc, mrlOrPolar='mrl', plotRows=2, plotCols=3)
+        mrl_ax[-1].legend(loc='upper right')  # Add legend to the last subplot
+        mrl_plotter.save_figure(mrl_fig, self.scratchPlotDirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else mrl_plotter.save_figure(mrl_fig, plot_dirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')     
+        
