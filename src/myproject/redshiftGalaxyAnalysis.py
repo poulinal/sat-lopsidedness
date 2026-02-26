@@ -724,7 +724,7 @@ class GalaxyAnalysis:
     #plot the pairwise polar differences for these mass bins and split between central is most massive or not
     def plot_pairwise_polar_by_mass_bins_and_centralMassive_status(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None): #mass_filtered_list : ListGalaxyGroup, mass_bin_label):
         prob_polar_mass_plotter = AstroPlotter()
-        prob_polar_mass_fig, prob_polar_mass_ax = prob_polar_mass_plotter.create_figure(ncols=1, nrows=len(listGG), figsize=(8, 6*len(listGG)))
+        prob_polar_mass_fig, prob_polar_mass_ax = prob_polar_mass_plotter.create_figure(ncols=len(listGG), figsize=(8*len(listGG), 6))
 
         colors = ['blue', 'orange', 'red', 'green', 'purple']                                                          
         for i, (mass_filtered_list, mass_bin_label) in enumerate(listGG):
@@ -800,7 +800,7 @@ class GalaxyAnalysis:
         
     def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
         overlayMRLPlotter = AstroPlotter()
-        overlayMRLFig, overlayMRLAx = overlayMRLPlotter.create_figure(ncols=1, nrows = len(listGG), figsize=(8, 6*len(listGG)))
+        overlayMRLFig, overlayMRLAx = overlayMRLPlotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8*len(listGG), 6)) if len(listGG) > 1 else overlayMRLPlotter.create_figure()
         
         numsamples=1000
 
@@ -1046,6 +1046,37 @@ class GalaxyAnalysis:
         #compute for each group (13-13.5, 13.5-14, 14-14.5, 14.5-15, >15)
         self.overlayMRLAndMRLRandom([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '$13<M_{200}<13.5$'), (self.filtered_gt13p5_ls14_list_of_galaxy_groups, '$13.5<M_{200}<14$'), (self.filtered_gt14_ls14p5_list_of_galaxy_groups, '$14<M_{200}<14.5$'), (self.filtered_gt14p5_ls15_list_of_galaxy_groups, '$14.5<M_{200}<15$'), (self.filtered_gt15_list_of_galaxy_groups, '$M_{200}>15$')])
 
+    #for each group, plot the probability distribution of a galaxy group's M200
+    def M200DistributionPlots(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
+        M200_plotter = AstroPlotter()
+        M200_fig, M200_ax = M200_plotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8, 6*len(listGG)) if len(listGG) > 1 else M200_plotter.create_figure())
+        for i, (listGalaxyGroup, label) in enumerate(listGG):
+            M200_values = []
+            for gg in listGalaxyGroup.getAllGalaxyGroups():
+                print(f"processing galaxy group {gg.getGroupID()} for M200 distribution", end='\r', flush=True)
+                M200_values.append(gg.getMCrit200())
+            M200_bins, M200_bin_edges, M200_errorbars = ListGalaxyGroup.get_histogram_bins(M200_values, binsize=0.1, binLow=13, binHigh=15, errorbarType='poisson')
+
+            if len(listGG) > 1:
+                print(f"choosing ax, {i}")
+                axToPlot = M200_ax[i]
+            else:
+                axToPlot = M200_ax
+
+            M200_plotter.scatter_plot(
+                M200_bin_edges, 
+                M200_bins,
+                # errorBars = M200_errorbars,
+                ax=axToPlot, # Use the same axis for overlay
+                xlabel='$M_{200}$ (Msun)',
+                ylabel='Probability Density',
+                title=f'$M_{{200}}$ Distribution for {self.sim} ({label})',
+                # ylim = (0, 0.01),
+                label=f"{label}",
+                output_filename=None,
+                grid=True,
+            )
+        M200_plotter.save_figure(M200_fig, self.scratchPlotDirc + f'/M200_distribution_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/M200_distribution_{self.plotIdentifier}.png')
 
 
     def HighMRLPlots(self, plot_dirc : str = None):
@@ -1281,7 +1312,7 @@ class GalaxyAnalysis:
         if polar_plotter is None:
             polar_plotter = AstroPlotter()
         if polar_fig is None or polar_ax is None:
-            polar_fig, polar_ax = polar_plotter.create_figure(ncols=1, nrows=len(listRedshiftGG[0]), figsize=(8, 6*len(listRedshiftGG[0]))) if plotRows == 0 or plotCols == 0 else polar_plotter.create_figure(ncols=plotCols, nrows=plotRows, figsize=(8*plotCols, 6*plotRows))
+            polar_fig, polar_ax = polar_plotter.create_figure(ncols=len(listRedshiftGG[0]), nrows=1, figsize=(8, 6*len(listRedshiftGG[0]))) if plotRows == 0 or plotCols == 0 else polar_plotter.create_figure(ncols=plotCols, nrows=plotRows, figsize=(8*plotCols, 6*plotRows))
         
         for redshift_index, listGG in enumerate(listRedshiftGG):
             for i, (listGalaxyGroup, label) in enumerate(listGG):
