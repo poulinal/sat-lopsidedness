@@ -854,6 +854,9 @@ class GalaxyAnalysis:
             print(f"Overall number of MRL values above 99th percentile: {np.sum(np.array(MRL_values) > percentile_99_MRL)} out of {len(MRL_values)}")
             
             print(f"len listGG: {len(listGG)}, len MRL_values: {len(MRL_values)}, len random_MRL_values: {len(random_MRL_values)}")
+            #include a text box in the plot with the fraction of MRL values that are less than the 99th percentile of random MRL values
+            fraction_less_than_99th_percentile = np.sum(np.array(MRL_values) < percentile_99_MRL) / len(MRL_values)
+            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < 99th percentile of random MRL: {fraction_less_than_99th_percentile:.2f}")
             
             # save into .txt file:
             # In table: galaxy id, num of members, mass of cluster, MRL value of that projection, fraction less than the MRL I measured
