@@ -37,9 +37,9 @@ class GalaxyAnalysis:
         self.redVsBluePairwisePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        self.centralFoFDistanceOffsets(self.scratchPlotDirc)
+        # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
         self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
-        self.MRLDistributionPlots(self.scratchPlotDirc)
+        # self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
@@ -463,39 +463,39 @@ class GalaxyAnalysis:
 
         print(f"total number of galaxy groups: {self.filtered_gt13_ls13p5_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt13p5_ls14_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt14_ls14p5_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt14p5_ls15_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt15_list_of_galaxy_groups.getNumGalaxyGroups()}")
 
-        #print the num of galaxies in each group where the central is not the most massive
-        num_mostMassiveNotCentral = 0
-        for gg in self.filtered_gt13_ls13p5_list_of_galaxy_groups.listGalaxyGroups:
-            if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-                # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-                num_mostMassiveNotCentral +=1
-            else:
-                print(gg.getMostMassiveSubhalo().getPosition(), gg.getMostCentralSubhalo().getPosition())
-        print(f"Number of groups with most massive not central in 13-13.5 bin: {num_mostMassiveNotCentral}")
-        num_mostMassiveNotCentral = 0
-        for gg in self.filtered_gt13p5_ls14_list_of_galaxy_groups.listGalaxyGroups:
-            if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-                # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-                num_mostMassiveNotCentral +=1
-        print(f"Number of groups with most massive not central in 13.5-14 bin: {num_mostMassiveNotCentral}")
-        num_mostMassiveNotCentral = 0
-        for gg in self.filtered_gt14_ls14p5_list_of_galaxy_groups.listGalaxyGroups:
-            if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-                # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-                num_mostMassiveNotCentral +=1
-        print(f"Number of groups with most massive not central in 14-14.5 bin: {num_mostMassiveNotCentral}")
-        num_mostMassiveNotCentral = 0
-        for gg in self.filtered_gt14p5_ls15_list_of_galaxy_groups.listGalaxyGroups:
-            if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-                # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-                num_mostMassiveNotCentral +=1
-        print(f"Number of groups with most massive not central in 14.5-15 bin: {num_mostMassiveNotCentral}")
-        num_mostMassiveNotCentral = 0
-        for gg in self.filtered_gt15_list_of_galaxy_groups.listGalaxyGroups:
-            if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-                # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-                num_mostMassiveNotCentral +=1
-        print(f"Number of groups with most massive not central in >15 bin: {num_mostMassiveNotCentral}")
+        # #print the num of galaxies in each group where the central is not the most massive
+        # num_mostMassiveNotCentral = 0
+        # for gg in self.filtered_gt13_ls13p5_list_of_galaxy_groups.listGalaxyGroups:
+        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
+        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
+        #         num_mostMassiveNotCentral +=1
+        #     else:
+        #         print(gg.getMostMassiveSubhalo().getPosition(), gg.getMostCentralSubhalo().getPosition())
+        # print(f"Number of groups with most massive not central in 13-13.5 bin: {num_mostMassiveNotCentral}")
+        # num_mostMassiveNotCentral = 0
+        # for gg in self.filtered_gt13p5_ls14_list_of_galaxy_groups.listGalaxyGroups:
+        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
+        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
+        #         num_mostMassiveNotCentral +=1
+        # print(f"Number of groups with most massive not central in 13.5-14 bin: {num_mostMassiveNotCentral}")
+        # num_mostMassiveNotCentral = 0
+        # for gg in self.filtered_gt14_ls14p5_list_of_galaxy_groups.listGalaxyGroups:
+        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
+        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
+        #         num_mostMassiveNotCentral +=1
+        # print(f"Number of groups with most massive not central in 14-14.5 bin: {num_mostMassiveNotCentral}")
+        # num_mostMassiveNotCentral = 0
+        # for gg in self.filtered_gt14p5_ls15_list_of_galaxy_groups.listGalaxyGroups:
+        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
+        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
+        #         num_mostMassiveNotCentral +=1
+        # print(f"Number of groups with most massive not central in 14.5-15 bin: {num_mostMassiveNotCentral}")
+        # num_mostMassiveNotCentral = 0
+        # for gg in self.filtered_gt15_list_of_galaxy_groups.listGalaxyGroups:
+        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
+        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
+        #         num_mostMassiveNotCentral +=1
+        # print(f"Number of groups with most massive not central in >15 bin: {num_mostMassiveNotCentral}")
     
         #plot the mass ratio distribution (most central / most massive) for these mass bins
         prob_mass_ratio_plotter = AstroPlotter()
@@ -732,9 +732,9 @@ class GalaxyAnalysis:
             not_central_most_massive_list_of_galaxy_groups = mass_filtered_list.getFilterSubhalos(centralIsMostMassive=False)
             print(f"len GG: {len(central_most_massive_list_of_galaxy_groups.getAllGalaxyGroups()), len(not_central_most_massive_list_of_galaxy_groups.getAllGalaxyGroups())}")
 
-            list_pairwise_polar_differences_centralMassive = central_most_massive_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
-            list_pairwise_polar_differences_notCentralMassive = not_central_most_massive_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
-            list_pairwise_polar_differences_total = mass_filtered_list.compute_probablity_distribution_of_polar_differences(parallelize=False)
+            list_pairwise_polar_differences_centralMassive = central_most_massive_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_centralMassive_{mass_bin_label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
+            list_pairwise_polar_differences_notCentralMassive = not_central_most_massive_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_notCentralMassive_{mass_bin_label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
+            list_pairwise_polar_differences_total = mass_filtered_list.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_{mass_bin_label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
             
             pairwise_polar_differences_centralMassive, polar_bin_centers_centralMassive, pairwise_polar_centralMassive_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_centralMassive, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
             pairwise_polar_differences_notCentralMassive, polar_bin_centers_notCentralMassive, pairwise_polar_notCentralMassive_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_notCentralMassive, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
@@ -805,7 +805,7 @@ class GalaxyAnalysis:
         numsamples=1000
 
         for i, (listGalaxyGroup, label) in enumerate(listGG):
-            MRL_values = listGalaxyGroup.compute_probablity_distribution_of_MRL_directionality(parallelize=False)
+            MRL_values = listGalaxyGroup.compute_probablity_distribution_of_MRL_directionality(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/MRL_values_{label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
             if not MRL_values or len(MRL_values) == 0:
                 print(f"Skipping {label}: No MRL values to plot.")
                 continue
@@ -1066,7 +1066,7 @@ class GalaxyAnalysis:
         high_MRL_list_of_galaxy_groups = ListGalaxyGroup(high_MRL_galaxy_groups)
 
         #plot the pairwise polar distribution for these high MRL groups
-        high_MRL_pairwise_polar_differences = high_MRL_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
+        high_MRL_pairwise_polar_differences = high_MRL_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_{self.plotIdentifier}', rewrite=self.generalRewrite)
         high_MRL_pairwise_polar_bins, high_MRL_pairwise_polar_bin_centers, high_MRL_pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences, bins = np.arange(0, 185, 10), errorbarType='poisson')
         high_MRL_polar_plotter = AstroPlotter()
         high_MRL_polar_fig, high_MRL_polar_ax = high_MRL_polar_plotter.create_figure()
@@ -1086,10 +1086,10 @@ class GalaxyAnalysis:
 
         #plot <35% R200 and >65% R200 for these high MRL groups
         high_MRL_LT35R200_list_of_galaxy_groups = high_MRL_list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0,0.35])
-        high_MRL_pairwise_polar_differences_inner = high_MRL_LT35R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
+        high_MRL_pairwise_polar_differences_inner = high_MRL_LT35R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_inner_{self.plotIdentifier}', rewrite=self.generalRewrite)
         high_MRL_pairwise_polar_bins_inner, high_MRL_pairwise_polar_bin_centers_inner, high_MRL_pairwise_polar_errorbars_inner = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_inner, bins = np.arange(0, 185, 10), errorbarType='poisson')
         high_MRL_GT65R200_list_of_galaxy_groups = high_MRL_list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0.65,1])
-        high_MRL_pairwise_polar_differences_outer = high_MRL_GT65R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
+        high_MRL_pairwise_polar_differences_outer = high_MRL_GT65R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_outer_{self.plotIdentifier}', rewrite=self.generalRewrite)
         high_MRL_pairwise_polar_bins_outer, high_MRL_pairwise_polar_bin_centers_outer, high_MRL_pairwise_polar_errorbars_outer = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_outer, bins = np.arange(0, 185, 10), errorbarType='poisson')
         high_MRL_polar_plotter.scatter_plot(
             high_MRL_pairwise_polar_bin_centers_inner, 
@@ -1287,9 +1287,9 @@ class GalaxyAnalysis:
             for i, (listGalaxyGroup, label) in enumerate(listGG):
                 print(f"COMPUTING FOR redshift index: {redshift_index}, label: {label}")
                 if mrlOrPolar == 'mrl':
-                    pairwise_polar_differences = listGalaxyGroup.compute_mrl_distribution_of_polar_differences(parallelize=False)
+                    pairwise_polar_differences = listGalaxyGroup.compute_mrl_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/MRL_values_{label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
                 else:
-                    pairwise_polar_differences = listGalaxyGroup.compute_probablity_distribution_of_polar_differences(parallelize=False)
+                    pairwise_polar_differences = listGalaxyGroup.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_{label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
                     pairwise_polar_bins, pairwise_polar_bin_centers, pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(pairwise_polar_differences, bins=np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
                 xlabel = 'Pairwise Polar Difference (degrees)' if mrlOrPolar == 'polar' else 'MRL Directionality of Pairwise Polar Difference'
                 ylabel = 'Probability Density' if mrlOrPolar == 'polar' else 'Probability Density of MRL Directionality'
@@ -1338,7 +1338,7 @@ class GalaxyAnalysis:
             listRedshiftGG.append(group_list)
 
         polar_plotter, polar_fig, polar_ax = self.overlay_polar_pairwise_across_redshifts(listRedshiftGG, plot_dirc=plot_dirc, mrlOrPolar='polar', plotRows=2, plotCols=3)
-        return polar_plotter, polar_fig, polar_ax
+        # return polar_plotter, polar_fig, polar_ax
         polar_ax[-1].legend(loc='upper right')  # Add legend to the last subplot
         polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')
         
