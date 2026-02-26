@@ -236,12 +236,12 @@ class GalaxyAnalysis:
         return intersection_point, intersection_point_valid
     
     def redVsBluePairwisePlot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
-        intersectionPoint = self.redVsBlueDistributionPlot(list_of_galaxy_groups=filtered_red_list_of_galaxy_groups, plot_dirc=plot_dirc)
+        intersectionPoint, intersectionPointValid = self.redVsBlueDistributionPlot(list_of_galaxy_groups=list_of_galaxy_groups, plot_dirc=plot_dirc)
         
-        filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True)
+        filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True, redBluePoint=intersectionPoint)
         print(f'Number of galaxy groups with only red satellites: {filtered_red_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
-        filtered_blue_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(blueGalaxies=True)
+        filtered_blue_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(blueGalaxies=True, redBluePoint=intersectionPoint)
         print(f'Number of galaxy groups with only blue satellites: {filtered_blue_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
         list_pairwise_polar_differences_red = filtered_red_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_red_{self.plotIdentifier}', rewrite=self.generalRewrite)
