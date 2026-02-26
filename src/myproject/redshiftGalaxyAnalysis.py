@@ -162,15 +162,78 @@ class GalaxyAnalysis:
     def redVsBlueDistributionPlot(self, list_of_galaxy_groups : ListGalaxyGroup, plot_dirc : str = None):
         #plot the g-r color distribution for red and blue galaxies in the same plot
         #fit a Gaussian to the g-r color distribution for red and blue galaxies and find the intersection point of the two Gaussians to use as a threshold for separating red and blue galaxies
-        for galaxy_group in list_of_galaxy_groups:
-            print(f"Processing galaxy group {galaxy_group}")
-            if not galaxy_group.isRed():
-                print(f"Galaxy group {galaxy_group} is not red")
-                continue
-            if not galaxy_group.isBlue():
-                print(f"Galaxy group {galaxy_group} is not blue")
-                continue
-            print(f"Galaxy group {galaxy_group} is both red and blue")
+        gMr_values = []
+        for galaxy_group in list_of_galaxy_groups.getAllGalaxyGroups():
+            for subhalo in galaxy_group.getSubhalos():
+                g_mag = subhalo.getGbandMagnitude()
+                r_mag = subhalo.getRbandMagnitude()
+                if np.isnan(g_mag) or np.isnan(r_mag):
+                    print("WARNING... np.nan")
+                    continue  # Skip if magnitudes are not available
+                g_r_color = g_mag - r_mag
+                gMr_values.append(g_r_color)
+                
+        gMr_values = np.array(gMr_values)
+        from scipy.stats import norm
+        # Fit Gaussian to the g-r color distribution        
+        mu, std = norm.fit(gMr_values)
+        # Generate x values for the Gaussian curve
+        x = np.linspace(min(gMr_values), max(gMr_values), 1000)
+        # Calculate the Gaussian curve values        
+        p = norm.pdf(x, mu, std)
+        # Find the intersection point of the Gaussian curve with a horizontal line at the minimum between the two peaks to determine the threshold for separating red and blue galaxies
+        from scipy.signal import find_peaks
+        peaks, _ = find_peaks(p)
+        intersection_point_valid=False
+        if len(peaks) < 2:
+            print("Warning: Less than 2 peaks found in the g-r color distribution, cannot determine intersection point for red vs blue separation.")
+            intersection_point = 0.65  # Default to 0.65 if we cannot find a clear separation
+        else:
+            min_between_peaks = np.argmin(p[peaks[0]:peaks[1]]) + peaks[0]
+            intersection_point = x[min_between_peaks]
+            print(f"Determined intersection point for red vs blue separation: {intersection_point:.2f}")
+            intersection_point_valid=True
+        # Plot the g-r color distribution and the Gaussian fit
+        color_plotter = AstroPlotter()
+        color_fig, color_ax = color_plotter.create_figure()
+        color_plotter.histogram(
+            gMr_values,
+            bins=50,
+            density=True,
+            alpha=0.6,
+            color='gray',
+            ax=color_ax
+        )
+        color_plotter.plot(
+            x,
+            p,
+            color='black',
+            ax=color_ax,
+            label=f'Gaussian Fit (μ={mu:.2f}, σ={std:.2f})'
+        )
+        color_plotter.axvline(
+            intersection_point,
+            color='red',
+            linestyle='--',
+            ax=color_ax,
+            label=f'Intersection Point = {intersection_point:.2f}'
+        )
+        color_plotter.set_labels(
+            xlabel='g-r Color',
+            ylabel='Density',
+            title=f'g-r Color Distribution with Gaussian Fit for {self.plotIdentifier}'
+        )
+        color_plotter.add_legend(ax=color_ax)
+        #add a text box in the plot with the mean and standard deviation of the g-r color distribution and the intersection point
+        color_plotter.add_text_box(
+            color_ax, 
+            f"Mean (μ) = {mu:.2f}\nStandard Deviation (σ) = {std:.2f}\nIntersection Point = {intersection_point:.2f}", 
+            loc='bottom center'
+        )
+        color_plotter.save(
+            self.scratchPlotDirc + f'/color_distribution/color_distribution_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}.png'
+        )
+        return intersection_point, intersection_point_valid
     
     def redVsBluePairwisePlot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         intersectionPoint = self.redVsBlueDistributionPlot(list_of_galaxy_groups=filtered_red_list_of_galaxy_groups, plot_dirc=plot_dirc)

@@ -670,7 +670,7 @@ class AstroPlotter:
         text : str
             Text content
         loc : str
-            Location ('upper right', 'lower left', etc.)
+            Location ('upper right', 'lower left', 'upper left', 'lower right', 'center', 'outside upper right', 'bottom center')
         fontsize : int, optional
             Font size
         **kwargs
