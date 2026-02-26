@@ -208,11 +208,21 @@ class GalaxyAnalysis:
         
         # save as txt file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_color/pairwise_polar_color_difference_{self.plotIdentifier}.txt'
-        print(f"data to be saved: {np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Error Bar (Red)    Probability Density (Blue)    Error Bar (Blue)')
+        arrays = [polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars]
+        max_len = max(len(arr) for arr in arrays)
+        arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
+        if any(len(arr) != max_len for arr in arrays):
+            print(f"Warning: Arrays have different lengths, padding to {max_len} with NaN for saving pairwise polar color difference.")
+        print(f"data to be saved: {np.column_stack(arrays_padded)}")
+        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Error Bar (Red)    Probability Density (Blue)    Error Bar (Blue)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_color/pairwise_polar_color_difference_RAW_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_red, list_pairwise_polar_differences_blue)), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
+        raw_arrays = [list_pairwise_polar_differences_red, list_pairwise_polar_differences_blue]
+        max_raw_len = max(len(arr) for arr in raw_arrays)
+        raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
+        if any(len(arr) != max_raw_len for arr in raw_arrays):
+            print(f"Warning: Raw arrays have different lengths, padding to {max_raw_len} with NaN for saving raw pairwise polar color difference.")
+        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
         
     def member150v50Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_GT150_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(minNumGalaxies=150)
@@ -259,11 +269,16 @@ class GalaxyAnalysis:
         
         # save as text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_memberNum/pairwise_polar_memberNum_difference_{self.plotIdentifier}.txt'
-        # print(f"data to be saved: {np.column_stack((polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_differences_GT150))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT50, pairwise_polar_differences_LT50,  pairwise_polar_LT50_errorbars, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Error Bar (<50 Satellites)    Probability Density (>150 Satellites)    Error Bar (>150 Satellites)')
+        arrays = [polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_LT50_errorbars, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars]
+        max_len = max(len(arr) for arr in arrays)
+        arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
+        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Error Bar (<50 Satellites)    Probability Density (>150 Satellites)    Error Bar (>150 Satellites)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_memberNum/pairwise_polar_memberNum_difference_RAW_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_LT50, list_pairwise_polar_differences_GT150)), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
+        raw_arrays = [list_pairwise_polar_differences_LT50, list_pairwise_polar_differences_GT150]
+        max_raw_len = max(len(arr) for arr in raw_arrays)
+        raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
+        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
 
     def memberL35vG65Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_LT35R200_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0,0.35])
@@ -309,11 +324,16 @@ class GalaxyAnalysis:
         
         #save bin centers and probabilities and errorbars to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_radius/pairwise_polar_radius_difference_{self.plotIdentifier}.txt'
-        # print(f"data to be saved: {np.column_stack((polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_differences_GT65R200))}")
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Error Bar (<35% R200)    Probability Density (65-100% R200)    Error Bar (65-100% R200)')
+        arrays = [polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars]
+        max_len = max(len(arr) for arr in arrays)
+        arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
+        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Error Bar (<35% R200)    Probability Density (65-100% R200)    Error Bar (65-100% R200)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_radius/pairwise_polar_radius_difference_RAW_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences_LT35R200, list_pairwise_polar_differences_GT65R200)), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
+        raw_arrays = [list_pairwise_polar_differences_LT35R200, list_pairwise_polar_differences_GT65R200]
+        max_raw_len = max(len(arr) for arr in raw_arrays)
+        raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
+        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
     
     def getCentral_FoF_distanceOffset(self, list_of_galaxy_groups : ListGalaxyGroup):
         distanceOffsets = []
@@ -884,15 +904,22 @@ class GalaxyAnalysis:
                         f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{MRL_value}\n")
                         
             #save bin centers and probabilities and errorbars to text file
+            # Save bin centers and probabilities and errorbars to text file, padding with NaN if needed
             with open(self.scratchPlotDirc + f'/MRL_distribution_curves_{label}_{self.plotIdentifier}.txt', 'w') as f:
                 f.write("MRLBinCenter\tMRLProbability\tMRLErrorBar\tRandomMRLBinCenter\tRandomMRLProbability\tRandomMRLErrorBar\n")
-                for m, (mrl_bin_center, mrl_prob, mrl_errorbar, random_mrl_bin_center, random_mrl_prob, random_mrl_errorbar) in enumerate(zip(MRL_bin_centers, MRL_binned, MRL_errorbars, random_MRL_bin_centers, random_MRL_bins, random_MRL_errorbars)):
-                    f.write(f"{mrl_bin_center}\t{mrl_prob}\t{mrl_errorbar}\t{random_mrl_bin_center}\t{random_mrl_prob}\t{random_mrl_errorbar}\n")
-            #save raw MRL values and random MRL values to text file
+                arrays = [MRL_bin_centers, MRL_binned, MRL_errorbars, random_MRL_bin_centers, random_MRL_bins, random_MRL_errorbars]
+                max_len = max(len(arr) for arr in arrays)
+                arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
+                for m in range(max_len):
+                    f.write("\t".join(str(arr[m]) for arr in arrays_padded) + "\n")
+            #save raw MRL values and random MRL values to text file, padding with NaN if needed
             with open(self.scratchPlotDirc + f'/MRL_raw_values_{label}_{self.plotIdentifier}.txt', 'w') as f:
                 f.write("MRLValue\tRandomMRLValue\n")
-                for n, (mrl_value, random_mrl_value) in enumerate(zip(MRL_values, random_MRL_values)):
-                    f.write(f"{mrl_value}\t{random_mrl_value}\n")
+                max_raw_len = max(len(MRL_values), len(random_MRL_values))
+                mrl_values_padded = np.pad(MRL_values, (0, max_raw_len - len(MRL_values)), constant_values=np.nan)
+                random_mrl_values_padded = np.pad(random_MRL_values, (0, max_raw_len - len(random_MRL_values)), constant_values=np.nan)
+                for n in range(max_raw_len):
+                    f.write(f"{mrl_values_padded[n]}\t{random_mrl_values_padded[n]}\n")
         # overlayAxToPlot.legend()
         overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png')
         
