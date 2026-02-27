@@ -39,11 +39,12 @@ class GalaxyAnalysis:
         self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
         self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
-        # self.MRLDistributionPlots(self.scratchPlotDirc)
+        self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
         self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
+        self.plot_M200_distribution_for_all_mass_bins(self.scratchPlotDirc)
 
     def computeRedShiftPlots(self):
         self.plot_joining_redshift_for_all_mass_bins(self.scratchPlotDirc)
@@ -75,8 +76,10 @@ class GalaxyAnalysis:
     def setGeneralRewrite(self, rewrite : bool):
         self.generalRewrite = rewrite
     
-    def setSnapshot(self, newsnapshot:int):
+    def setSnapshot(self, newsnapshot:int, newsim:str='TNG300-1'):
         self.snapshot = newsnapshot
+        self.sim = newsim
+        self.plotIdentifier = f'{newsim}_{self.snapshot_dic[newsnapshot][1]}'
         self.setDircs()
         self.load_galaxy_groups()
         self.initializeMassSubgroups()
@@ -117,7 +120,7 @@ class GalaxyAnalysis:
             ylabel='Probability Density',
             title=f'Probability Pairwise Polar Difference Distribution for {self.plotIdentifier}',
             # ylim = (0, 0.01),
-            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/pairwise_polar_difference_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/pairwise_polar_difference_{self.plotIdentifier}.pdf',
             grid=True,
         )
         
@@ -145,7 +148,7 @@ class GalaxyAnalysis:
             ylabel='Probability Density',
             title=f'Probability MRL Directionality Distribution for {self.plotIdentifier}',
             # ylim=(0,4)
-            output_filename=self.scratchPlotDirc + f'/MRL/MRL_directionality_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/MRL_directionality_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/MRL/MRL_directionality_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/MRL_directionality_{self.plotIdentifier}.pdf',
             grid=True
         )
         
@@ -162,76 +165,91 @@ class GalaxyAnalysis:
     def redVsBlueDistributionPlot(self, list_of_galaxy_groups : ListGalaxyGroup, plot_dirc : str = None):
         #plot the g-r color distribution for red and blue galaxies in the same plot
         #fit a Gaussian to the g-r color distribution for red and blue galaxies and find the intersection point of the two Gaussians to use as a threshold for separating red and blue galaxies
-        gMr_values = []
+        gMr_values_raw = []
         for galaxy_group in list_of_galaxy_groups.getAllGalaxyGroups():
             for subhalo in galaxy_group.getSubhalos():
                 g_mag = subhalo.getGbandMagnitude()
                 r_mag = subhalo.getRbandMagnitude()
+                # print(f"g_mag, :{g_mag}, rmag: {r_mag}")
                 if np.isnan(g_mag) or np.isnan(r_mag):
                     print("WARNING... np.nan")
                     continue  # Skip if magnitudes are not available
                 g_r_color = g_mag - r_mag
-                gMr_values.append(g_r_color)
+                gMr_values_raw.append(abs(g_r_color))
                 
-        gMr_values = np.array(gMr_values)
+        # gMr_values = np.array(gMr_values)
+        from sklearn.mixture import GaussianMixture
         from scipy.stats import norm
-        # Fit Gaussian to the g-r color distribution        
-        mu, std = norm.fit(gMr_values)
-        # Generate x values for the Gaussian curve
-        x = np.linspace(min(gMr_values), max(gMr_values), 1000)
-        # Calculate the Gaussian curve values        
-        p = norm.pdf(x, mu, std)
-        # Find the intersection point of the Gaussian curve with a horizontal line at the minimum between the two peaks to determine the threshold for separating red and blue galaxies
-        from scipy.signal import find_peaks
-        peaks, _ = find_peaks(p)
-        intersection_point_valid=False
-        if len(peaks) < 2:
-            print("Warning: Less than 2 peaks found in the g-r color distribution, cannot determine intersection point for red vs blue separation.")
-            intersection_point = 0.65  # Default to 0.65 if we cannot find a clear separation
+
+        gMr_values = np.array(gMr_values_raw).reshape(-1, 1)
+        gmm = GaussianMixture(n_components=2, random_state=0)
+        gmm.fit(gMr_values)
+        means = gmm.means_.flatten()
+        stds = np.sqrt(gmm.covariances_).flatten()
+        weights = gmm.weights_.flatten()
+
+        # Sort by mean for consistency
+        order = np.argsort(means)
+        means, stds, weights = means[order], stds[order], weights[order]
+
+        # Generate x values
+        x = np.linspace(gMr_values.min(), gMr_values.max(), 1000)
+        pdf1 = weights[0] * norm.pdf(x, means[0], stds[0])
+        pdf2 = weights[1] * norm.pdf(x, means[1], stds[1])
+
+        # Find intersection point
+        intersection_idx = np.argwhere(np.diff(np.sign(pdf1 - pdf2))).flatten()
+        if intersection_idx.size > 0:
+            intersection_point = x[intersection_idx[0]]
+            intersection_point_valid = True
         else:
-            min_between_peaks = np.argmin(p[peaks[0]:peaks[1]]) + peaks[0]
-            intersection_point = x[min_between_peaks]
-            print(f"Determined intersection point for red vs blue separation: {intersection_point:.2f}")
-            intersection_point_valid=True
+            intersection_point = 0.65
+            intersection_point_valid = False
         # Plot the g-r color distribution and the Gaussian fit
         color_plotter = AstroPlotter()
         color_fig, color_ax = color_plotter.create_figure()
         color_plotter.histogram(
-            gMr_values,
+            gMr_values_raw,
             bins=50,
             density=True,
-            alpha=0.6,
+            # alpha=0.6,
             color='gray',
-            ax=color_ax
-        )
-        color_plotter.plot(
-            x,
-            p,
-            color='black',
             ax=color_ax,
-            label=f'Gaussian Fit (μ={mu:.2f}, σ={std:.2f})'
-        )
-        color_plotter.axvline(
-            intersection_point,
-            color='red',
-            linestyle='--',
-            ax=color_ax,
-            label=f'Intersection Point = {intersection_point:.2f}'
-        )
-        color_plotter.set_labels(
             xlabel='g-r Color',
             ylabel='Density',
             title=f'g-r Color Distribution with Gaussian Fit for {self.plotIdentifier}'
         )
-        color_plotter.add_legend(ax=color_ax)
+        color_plotter.line_plot(
+            x,
+            pdf1,
+            color='blue',
+            ax=color_ax,
+            label=f'Gaussian Fit (μ={means[0]:.2f}, σ={stds[0]:.2f})',
+            # include_legend=True,
+        )
+        color_plotter.line_plot(
+            x,
+            pdf2,
+            color='red',
+            ax=color_ax,
+            label=f'Gaussian Fit (μ={means[1]:.2f}, σ={stds[1]:.2f})',
+            # include_legend=True,
+        )
+        color_ax.axvline(
+            intersection_point,
+            color='green',
+            linestyle='--',
+            label=f'Intersection Point = {intersection_point:.2f}'
+        )
+        # color_plotter.add_legend(ax=color_ax)
         #add a text box in the plot with the mean and standard deviation of the g-r color distribution and the intersection point
         color_plotter.add_text_box(
             color_ax, 
-            f"Mean (μ) = {mu:.2f}\nStandard Deviation (σ) = {std:.2f}\nIntersection Point = {intersection_point:.2f}", 
+            f"Means (μ) = {means[0]:.2f}, {means[1]:.2f}\nStandard Deviation (σ) = {stds[0]:.2f}, {stds[1]:.2f}\nIntersection Point = {intersection_point:.2f}, {'T' if intersection_point_valid else 'F'}", 
             loc='bottom center'
         )
-        color_plotter.save(
-            self.scratchPlotDirc + f'/color_distribution/color_distribution_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}.png'
+        color_plotter.save_figure(color_fig,
+            self.scratchPlotDirc + f'/color_distribution/color_distribution_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}.pdf'
         )
         return intersection_point, intersection_point_valid
     
@@ -263,7 +281,7 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             c=['red'],
             errorBars = pairwise_polar_red_errorbars,
-            label = "Red Galaxies (g-r) ≥ 0.65",
+            label = f"Red Galaxies (g-r) ≥ {intersectionPoint:.2f}",
             output_filename=None,  # Disable saving for combined plot
             grid=True,
         )
@@ -277,9 +295,9 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             c=['blue'],
             errorBars = pairwise_polar_blue_errorbars,
-            label = "Blue Galaxies (g-r) < 0.65",
+            label = f"Blue Galaxies (g-r) < {intersectionPoint:.2f}",
             include_legend=True,
-            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_red_blue_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_red_blue_{self.plotIdentifier}.pdf',
             grid=True,
         )
         
@@ -340,7 +358,7 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             label="Less than 50 members",
             include_legend=True,
-            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_GT150_LT50_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_GT150_LT50_{self.plotIdentifier}.pdf',
             grid=True,
         )
         
@@ -395,7 +413,7 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             label="0.65<r<1.00 R200",
             include_legend=True,
-            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_LT35R200_GT65R200_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_LT35R200_GT65R200_{self.plotIdentifier}.pdf',
             grid=True,
         )
         
@@ -471,7 +489,7 @@ class GalaxyAnalysis:
             ylog=True,
             legend=True,
             linealpha=0.5,
-            output_filename=self.scratchPlotDirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_lt14.png' if plot_dirc is None else plot_dirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_lt14.png',
+            output_filename=self.scratchPlotDirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_lt14.pdf' if plot_dirc is None else plot_dirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_lt14.pdf',
             percentage=True,
             grid=True,
         )
@@ -486,7 +504,7 @@ class GalaxyAnalysis:
             ylog=True,
             legend=True,
             linealpha=0.5,
-            output_filename=self.scratchPlotDirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_gt14.png' if plot_dirc is None else plot_dirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_gt14.png',
+            output_filename=self.scratchPlotDirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_gt14.pdf' if plot_dirc is None else plot_dirc + f'/central_disparities/central_FoF_distance_{self.plotIdentifier}_gt14.pdf',
             percentage=True,
             grid=True,
         )
@@ -525,7 +543,7 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             label="$M_{{200}}$>1e14 Msun",
             include_legend=True,
-            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_gt14_lt14_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/pairwise_polar/pairwise_polar_difference_gt14_lt14_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/pairwise_polar/pairwise_polar_difference_gt14_lt14_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/pairwise_polar/pairwise_polar_difference_gt14_lt14_{self.plotIdentifier}.pdf',
             grid=True,
         )
         
@@ -649,7 +667,7 @@ class GalaxyAnalysis:
             ylog=True,
             legend=True,
             linealpha=0.5,
-            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_vs_most_central_massRatio_{self.plotIdentifier}_massBins.png' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_vs_most_central_massRatio_{self.plotIdentifier}_massBins.png',
+            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_vs_most_central_massRatio_{self.plotIdentifier}_massBins.pdf' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_vs_most_central_massRatio_{self.plotIdentifier}_massBins.pdf',
             percentage=True,
             grid=True,
         )
@@ -669,7 +687,7 @@ class GalaxyAnalysis:
             ylog=True,
             legend=True,
             linealpha=0.5,
-            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_vs_most_central_r_ratio_{self.plotIdentifier}_massBins.png' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_vs_most_central_r_ratio_{self.plotIdentifier}_massBins.png',
+            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_vs_most_central_r_ratio_{self.plotIdentifier}_massBins.pdf' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_vs_most_central_r_ratio_{self.plotIdentifier}_massBins.pdf',
             percentage=True,
             grid=True,
         )
@@ -729,7 +747,7 @@ class GalaxyAnalysis:
             ylog=True,
             legend=True,
             linealpha=0.5,
-            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_r_ratio_r200_{self.plotIdentifier}_massBins.png' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_r_ratio_r200_{self.plotIdentifier}_massBins.png',
+            output_filename=self.scratchPlotDirc + f'/central_disparities/most_massive_r_ratio_r200_{self.plotIdentifier}_massBins.pdf' if plot_dirc is None else plot_dirc + f'/central_disparities/most_massive_r_ratio_r200_{self.plotIdentifier}_massBins.pdf',
             percentage=True,
             grid=True,
         )
@@ -755,14 +773,14 @@ class GalaxyAnalysis:
         
         #replot this with different ylims
         prob_polar_mass_ax.set_ylim(0.0050, 0.0065)
-        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim.png') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim.png')
+        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim.pdf') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim.pdf')
 
         #overlay
         # polar_bin_centers, pairwise_polar_differences, pairwise_polar_errorbars
         pairwiseplot, polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars = self.pairwisePolarDifferencePlot(self.loaded_list_of_galaxy_groups)
         prob_polar_mass_ax.errorbar(polar_bin_centers, pairwise_polar_differences_binned, yerr=pairwise_polar_errorbars, fmt='o', label='All Galaxy Groups', color='black', markersize=3, alpha=0.5)
         prob_polar_mass_ax.legend()
-        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay.png') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay.png')
+        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay.pdf') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay.pdf')
         
     # plot the median number of subhalos within r200 for these mass bins
     def plot_median_num_subhalos_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
@@ -795,7 +813,7 @@ class GalaxyAnalysis:
             )
         median_subhalo_plotter.save_figure(
             fig=median_subhalo_fig,
-            filename=self.scratchPlotDirc + f'/median_num_subhalos_by_mass_bins_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/median_num_subhalos_by_mass_bins_{self.plotIdentifier}.png'
+            filename=self.scratchPlotDirc + f'/median_num_subhalos_by_mass_bins_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/median_num_subhalos_by_mass_bins_{self.plotIdentifier}.pdf'
         )
         
     #plot the pairwise polar differences for these mass bins and split between central is most massive or not
@@ -868,7 +886,7 @@ class GalaxyAnalysis:
                 
                 label="All Galaxy Groups",
                 include_legend=True,
-                # output_filename=scratchPlotDirc + f'/pairwise_polar_difference_total_{mass_bin_label.replace("<","lt").replace(">","gt")}_{sim}.png',
+                # output_filename=scratchPlotDirc + f'/pairwise_polar_difference_total_{mass_bin_label.replace("<","lt").replace(">","gt")}_{sim}.pdf',
                 grid=True,
             )
 
@@ -923,7 +941,7 @@ class GalaxyAnalysis:
                 label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
                 include_legend=True,
                 overlay_color='gray',
-                # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}.png',
+                # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}.pdf',
                 output_filename=None,
                 grid=True,
             )
@@ -941,7 +959,7 @@ class GalaxyAnalysis:
                 include_legend=True,
                 overlay_color='gray',
                 alpha=0,
-                # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}.png',
+                # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}.pdf',
                 output_filename=None,
                 grid=True,
                 spline_curvature=True,
@@ -998,7 +1016,7 @@ class GalaxyAnalysis:
                 for n in range(max_raw_len):
                     f.write(f"{mrl_values_padded[n]}\t{random_mrl_values_padded[n]}\n")
         # overlayAxToPlot.legend()
-        overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.png')
+        overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.pdf') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}.pdf')
         
         #append into overall .txt file:
         with open(self.scratchPlotDirc + f'/MRL_values_and_random_comparison_overall.txt', 'a') as f:
@@ -1095,7 +1113,7 @@ class GalaxyAnalysis:
             # ylim = (0, 0.01),
             label="200 Non-Centrals",
             alpha=0,
-            output_filename=self.scratchPlotDirc + f'/MRL_distribution_curves_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/MRL_distribution_curves_{self.plotIdentifier}.png',
+            output_filename=self.scratchPlotDirc + f'/MRL_distribution_curves_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/MRL_distribution_curves_{self.plotIdentifier}.pdf',
             include_legend=True,
             grid=True,
             spline_curvature=True,
@@ -1126,13 +1144,15 @@ class GalaxyAnalysis:
     #for each group, plot the probability distribution of a galaxy group's M200
     def M200DistributionPlots(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
         M200_plotter = AstroPlotter()
-        M200_fig, M200_ax = M200_plotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8, 6*len(listGG)) if len(listGG) > 1 else M200_plotter.create_figure())
+        M200_fig, M200_ax = M200_plotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8*len(listGG), 6) if len(listGG) > 1 else M200_plotter.create_figure())
         for i, (listGalaxyGroup, label) in enumerate(listGG):
             M200_values = []
             for gg in listGalaxyGroup.getAllGalaxyGroups():
                 print(f"processing galaxy group {gg.getGroupID()} for M200 distribution", end='\r', flush=True)
                 M200_values.append(gg.getMCrit200())
-            M200_bins, M200_bin_edges, M200_errorbars = ListGalaxyGroup.get_histogram_bins(M200_values, binsize=0.1, binLow=13, binHigh=15, errorbarType='poisson')
+            if len(M200_values) <= 1:
+                continue
+            # M200_bins, M200_bin_edges, M200_errorbars = ListGalaxyGroup.get_histogram_bins(M200_values, bins='auto', errorbarType='poisson')
 
             if len(listGG) > 1:
                 print(f"choosing ax, {i}")
@@ -1140,9 +1160,11 @@ class GalaxyAnalysis:
             else:
                 axToPlot = M200_ax
 
-            M200_plotter.scatter_plot(
-                M200_bin_edges, 
-                M200_bins,
+            # M200_plotter.scatter_plot(
+            #     M200_bin_edges, 
+            #     M200_bins,
+            M200_plotter.histogram(
+                M200_values,
                 # errorBars = M200_errorbars,
                 ax=axToPlot, # Use the same axis for overlay
                 xlabel='$M_{200}$ (Msun)',
@@ -1153,8 +1175,10 @@ class GalaxyAnalysis:
                 output_filename=None,
                 grid=True,
             )
-        M200_plotter.save_figure(M200_fig, self.scratchPlotDirc + f'/M200_distribution_{self.plotIdentifier}.png' if plot_dirc is None else plot_dirc + f'/M200_distribution_{self.plotIdentifier}.png')
-
+        M200_plotter.save_figure(M200_fig, self.scratchPlotDirc + f'/M200_distribution_{self.plotIdentifier}.pdf' if plot_dirc is None else plot_dirc + f'/M200_distribution_{self.plotIdentifier}.pdf')
+    
+    def plot_M200_distribution_for_all_mass_bins(self, plot_dirc : str = None):
+        self.M200DistributionPlots([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '$13<M_{200}<13.5$'), (self.filtered_gt13p5_ls14_list_of_galaxy_groups, '$13.5<M_{200}<14$'), (self.filtered_gt14_ls14p5_list_of_galaxy_groups, '$14<M_{200}<14.5$'), (self.filtered_gt14p5_ls15_list_of_galaxy_groups, '$14.5<M_{200}<15$'), (self.filtered_gt15_list_of_galaxy_groups, '$M_{200}>15$')], plot_dirc=plot_dirc)
 
     def HighMRLPlots(self, plot_dirc : str = None):
         # read high_MRL_galaxy_groups_13>$M_{200}>13.5$.txt file and get a list of galaxy group IDs with high MRL values
@@ -1188,7 +1212,7 @@ class GalaxyAnalysis:
             title=f'Pairwise Polar Difference Distribution for High MRL Galaxy Groups ($13<M_{{200}}<13.5$) in {self.sim}',
             # ylim = (0, 0.01),
             label="High MRL Galaxy Groups",
-            output_filename=self.scratchPlotDirc + f'/high_MRL_pairwise_polar_distribution_{self.sim}.png',
+            output_filename=self.scratchPlotDirc + f'/high_MRL_pairwise_polar_distribution_{self.sim}.pdf',
             grid=True,
         )
 
@@ -1222,7 +1246,7 @@ class GalaxyAnalysis:
             title=f'Pairwise Polar Difference Distribution for High MRL Galaxy Groups ($13<M_{{200}}<13.5$) in {self.sim}',
             # ylim = (0, 0.01),
             label="High MRL Galaxy Groups (>65% R200)",
-            output_filename=self.scratchPlotDirc + f'/high_MRL_pairwise_polar_distribution_inner_outer_{self.sim}.png',
+            output_filename=self.scratchPlotDirc + f'/high_MRL_pairwise_polar_distribution_inner_outer_{self.sim}.pdf',
             include_legend=True,
             grid=True,
         )
@@ -1268,7 +1292,7 @@ class GalaxyAnalysis:
         satellite_number_ax.legend()
         #set ylim min to 0
         satellite_number_ax.set_ylim(bottom=0)
-        satellite_number_plotter.save_figure(satellite_number_fig, self.scratchPlotDirc + f'/satellite_number_distribution_by_mass_bins_{self.sim}.png')
+        satellite_number_plotter.save_figure(satellite_number_fig, self.scratchPlotDirc + f'/satellite_number_distribution_by_mass_bins_{self.sim}.pdf')
         
     def plot_satellite_number_distribution_for_all_mass_bins(self, plot_dirc : str = None):
         list_of_mass_list_galaxy_groups = [self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups]
@@ -1276,12 +1300,15 @@ class GalaxyAnalysis:
         list_of_mass_bin_galaxy_groups = list(zip(list_of_mass_list_galaxy_groups, mass_bin_labels))
         self.plot_satellite_number_distribution_by_mass_bins(list_of_mass_bin_galaxy_groups)
 
-    def get_satellite_join_time(self, listGG:list[tuple[ListGalaxyGroup, str]], rewrite:bool = True):
+    def get_satellite_join_time(self, listGG:list[tuple[ListGalaxyGroup, str]], rewrite:Optional[bool] = None):
         #Box boundary 
         # L=75000. #kpc
         # halfbox=L/2.   
         # h=0.6774 
         joinTime = JoinTime(self.sim, self.snapshot)
+        if rewrite is None:
+            # rewrite = self.generalRewrite
+            rewrite=True
 
         totalSatellites = sum(gg.getNumSubhalos() for listGalaxyGroup, _ in listGG for gg in listGalaxyGroup.getAllGalaxyGroups())
         processedSatelliteIds = []
@@ -1289,20 +1316,20 @@ class GalaxyAnalysis:
         
         satellitesWihtoutMergerTree = []
         #load satellitesWihtoutMergerTree from file if exists
-        # if not rewrite:
-        if os.path.exists(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
-            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'r') as f:
-                lines = f.readlines()
-                for line in lines[1:]:  # Skip header line
-                    parts = line.split('\t')
-                    if len(parts) > 0:
-                        satellitesWihtoutMergerTree.append(int(parts[0]))
-            print(f"Loaded {len(satellitesWihtoutMergerTree)} satellites without merger tree from file.")
-        else:
-            print("No existing file for satellites without merger tree found, starting with an empty list.")
-            #prep the file with header
-            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
-                f.write("SatelliteSubhaloID\n")
+        if not rewrite:
+            if os.path.exists(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
+                with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'r') as f:
+                    lines = f.readlines()
+                    for line in lines[1:]:  # Skip header line
+                        parts = line.split('\t')
+                        if len(parts) > 0:
+                            satellitesWihtoutMergerTree.append(int(parts[0]))
+                print(f"Loaded {len(satellitesWihtoutMergerTree)} satellites without merger tree from file.")
+            else:
+                print("No existing file for satellites without merger tree found, starting with an empty list.")
+                #prep the file with header
+                with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
+                    f.write("SatelliteSubhaloID\n")
         
         #get all join times for each mass group
         for listGalaxyGroup, label in listGG:
@@ -1311,34 +1338,37 @@ class GalaxyAnalysis:
                 for _, label in listGG:
                     if os.path.exists(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt'):
                         print(f"File join_times_and_parameter_changes_{label}.txt already exists, skipping...")
-                        return
-            with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt', 'w') as f:
-                f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
-                for gg in listGalaxyGroup.getAllGalaxyGroups():
-                    # print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
-                    gg_id = gg.getGroupID()
-                    num_members = gg.getNumSubhalos()
-                    cluster_mass = gg.getMCrit200()
-                    #get the subhalo ID of the central galaxy, which is the one that joins the host halo
-                    central_subhalo : GalaxyGroup = gg.getCentralSubhalo()
-                    for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
-                        if central_subhalo is not None:
-                            # print(f"id: {subhalo.getIdx()}")
-                            #check if satellite has no merger tree
-                            if subhalo.getIdx() in satellitesWihtoutMergerTree:
-                                print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
-                                continue
-                            print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
-                            join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
-                            processedSatelliteIds.append(subhalo.getIdx())
-                            if join_time_info is None:
-                                print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
-                                satellitesWihtoutMergerTree.append(subhalo.getIdx())
-                                #write into file
-                                with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'a') as g:
-                                    g.write(f"{subhalo.getIdx()}\n")
-                                continue
-                            f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
+                        continue
+            else:
+                with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}_{label}.txt', 'w') as f:
+                    f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
+                    for gg in listGalaxyGroup.getAllGalaxyGroups():
+                        # print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
+                        gg_id = gg.getGroupID()
+                        num_members = gg.getNumSubhalos()
+                        cluster_mass = gg.getMCrit200()
+                        #get the subhalo ID of the central galaxy, which is the one that joins the host halo
+                        central_subhalo : GalaxyGroup = gg.getCentralSubhalo()
+                        for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
+                            if central_subhalo is not None:
+                                # print(f"id: {subhalo.getIdx()}")
+                                #check if satellite has no merger tree
+                                if subhalo.getIdx() in satellitesWihtoutMergerTree:
+                                    print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
+                                    continue
+                                print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
+                                join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
+                                processedSatelliteIds.append(subhalo.getIdx())
+                                if i == 0:
+                                    print(f"jointime: {join_time_info[0]}")
+                                if join_time_info is None:
+                                    print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
+                                    satellitesWihtoutMergerTree.append(subhalo.getIdx())
+                                    #write into file
+                                    with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'a') as g:
+                                        g.write(f"{subhalo.getIdx()}\n")
+                                    continue
+                                f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
         print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}")
 
     #plot the distribution of joining redshifts for each mass bin
@@ -1358,13 +1388,16 @@ class GalaxyAnalysis:
                     if len(parts) > 3:
                         join_time_info = [float(x) for x in parts[3:]]  # Extract joining redshift and other info
                         joining_redshifts.append(join_time_info[0])
+            print(f"joining redshifts: {joining_redshifts}")
             
-            joining_redshift_bins, joining_redshift_bin_edges, joining_redshift_errorbars = ListGalaxyGroup.get_histogram_bins(joining_redshifts, bins=np.arange(0, 3.5, 0.5), errorbarType='poisson')
+            # joining_redshift_bins, joining_redshift_bin_edges, joining_redshift_errorbars = ListGalaxyGroup.get_histogram_bins(joining_redshifts, bins='auto', errorbarType='poisson')
             
-            joining_redshift_plotter.scatter_plot(
-                joining_redshift_bin_edges, 
-                joining_redshift_bins,
-                errorBars = joining_redshift_errorbars,
+            # joining_redshift_plotter.scatter_plot(
+            #     joining_redshift_bin_edges, 
+            #     joining_redshift_bins,
+            #     errorBars = joining_redshift_errorbars,
+            joining_redshift_plotter.histogram(
+                joining_redshifts,
                 ax=joining_redshift_ax, # Use the same axis for overlay
                 xlabel='Joining Redshift',
                 ylabel='Probability Density',
@@ -1375,7 +1408,7 @@ class GalaxyAnalysis:
                 grid=True,
             )
         joining_redshift_ax.legend()
-        joining_redshift_plotter.save_figure(joining_redshift_fig, self.scratchPlotDirc + f'/joining_redshift_distribution_by_mass_bins_{self.sim}.png')
+        joining_redshift_plotter.save_figure(joining_redshift_fig, self.scratchPlotDirc + f'/joining_redshift_distribution_by_mass_bins_{self.sim}.pdf')
     
     def plot_joining_redshift_for_all_mass_bins(self, plot_dirc : str = None):
         list_of_mass_list_galaxy_groups = [self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups]
@@ -1427,7 +1460,7 @@ class GalaxyAnalysis:
         # else:
         #     for ax in polar_ax:
         #         ax.legend()
-        # polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')
+        # polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf')
         return polar_plotter, polar_fig, polar_ax
         
     def plot_pairwise_polar_difference_across_redshifts(self, plot_dirc:str = None):
@@ -1448,9 +1481,9 @@ class GalaxyAnalysis:
         polar_plotter, polar_fig, polar_ax = self.overlay_polar_pairwise_across_redshifts(listRedshiftGG, plot_dirc=plot_dirc, mrlOrPolar='polar', plotRows=2, plotCols=3)
         # return polar_plotter, polar_fig, polar_ax
         polar_ax[-1].legend(loc='upper right')  # Add legend to the last subplot
-        polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')
+        polar_plotter.save_figure(polar_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf') if plot_dirc is None else polar_plotter.save_figure(polar_fig, plot_dirc + f'/pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf')
         
         mrl_plotter, mrl_fig, mrl_ax = self.overlay_polar_pairwise_across_redshifts(listRedshiftGG, plot_dirc=plot_dirc, mrlOrPolar='mrl', plotRows=2, plotCols=3)
         mrl_ax[-1].legend(loc='upper right')  # Add legend to the last subplot
-        mrl_plotter.save_figure(mrl_fig, self.scratchPlotDirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png') if plot_dirc is None else mrl_plotter.save_figure(mrl_fig, plot_dirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.png')     
+        mrl_plotter.save_figure(mrl_fig, self.scratchPlotDirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf') if plot_dirc is None else mrl_plotter.save_figure(mrl_fig, plot_dirc + f'/mrl_directionality_of_pairwise_polar_difference_distribution_across_redshifts_{self.sim}.pdf')     
         

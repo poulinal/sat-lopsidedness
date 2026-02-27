@@ -281,7 +281,7 @@ class AstroPlotter:
                 cbar.set_label(clabel)
         
         if include_legend and label:
-            ax.legend()
+            ax.legend(loc='upper right')
         
         if output_filename:
             self.save_figure(fig, output_filename)
@@ -688,7 +688,7 @@ class AstroPlotter:
             'lower left': (0.05, 0.05),
             'center': (0.5, 0.5),
             'outside upper right': (1.05, 0.95),
-            'bottom center': (0.5, -0.05),
+            'bottom center': (0.5, -0.12),
         }
         
         xy = loc_dict.get(loc, (0.95, 0.95))

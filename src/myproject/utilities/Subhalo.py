@@ -65,17 +65,17 @@ class Subhalo:
         return self.vmaxRadius
     
     def getLuminosities(self):
-        return self.luminositiesSDSS # returns array with 8 elements corresponding to U, B, V, K, g, r, i, z bands
+        return self.luminosities # returns array with 8 elements corresponding to U, B, V, K, g, r, i, z bands
         #  the dimension 12 corresponds to twelve different projection directions (i.e. observer view angles), since the dust attenuation mode is view-dependent. In general, one can simply take the first entry for each subhalo, or a random entry for each subhalo
    
     def getLuminositiesSDSS(self):
-        return self.luminositiesSDSS
+        return (self.luminositiesSDSS[0][0],self.luminositiesSDSS[1][0],self.luminositiesSDSS[2][0],self.luminositiesSDSS[3][0],self.luminositiesSDSS[4][0],self.luminositiesSDSS[5][0],self.luminositiesSDSS[6][0],self.luminositiesSDSS[7][0])
 
     def getRbandMagnitude(self):
-        return self.getLuminosities()[5]#[0]
+        return self.getLuminositiesSDSS()[5]#[0]
     
     def getGbandMagnitude(self):
-        return self.getLuminosities()[4]#[0]
+        return self.getLuminositiesSDSS()[4]#[0]
     
     def getDistanceToGroupCenter(self):
         return self.distanceToGroupCenter

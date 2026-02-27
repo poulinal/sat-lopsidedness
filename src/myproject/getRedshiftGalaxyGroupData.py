@@ -13,6 +13,8 @@ class GalaxyGroupData:
         self.snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0'), 40: (1.5, 'z1p5'), 33: (2.0, 'z2p0'), 25: (3.0, 'z3p0')}
         possible_snapshots = list(self.snapshot_dic.keys())
         self.TNG300_1_volsize = 302.6 #Mpc
+        self.TNG_Cluster_volsize = 1003.8
+        self.TNG_Cluster_boxsize=680
         self.TNG300_1_boxsize = 205 #Mpc/h
         self.scratchDataDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/data'
         
@@ -38,6 +40,9 @@ class GalaxyGroupData:
 
         #convert boxsize to kpc from Mpc/h
         self.TNG300_1_boxsize_kpc = self.TNG300_1_boxsize * 1e3 /self.h #kpc
+        self.TNG_Cluster_boxsize_kpc = self.TNG_Cluster_boxsize * 1e3 / self.h
+        self.sim_boxsize_kpc = self.TNG_Cluster_boxsize if self.sim == 'TNG-Cluster' else self.TNG300_1_boxsize
+
 
         self.z = self.snapshot_dic[self.snapshot][0] #redshift
         self.a = 1.0 / (1 + self.z)  # scale factor, where z = redshift
@@ -67,10 +72,11 @@ class GalaxyGroupData:
         self.filtered_and_corrected_list_of_galaxy_groups = None
         
     def computeAllData(self):
-        for sim in ['TNG300-1']:
+        for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
                 subhalo_id = None #placeholder since we will be fetching all subhalos
                 self.__init__(sim, snapshot)
+                print(f"New z: {self.z}")
                 self.getSubhaloData(sim, snapshot)
                 self.getGroupData(sim, snapshot)
                 list_of_galaxy_groups = self.getListGalaxyGroup()
@@ -82,7 +88,7 @@ class GalaxyGroupData:
         headerInformation = {
             'simulation': self.sim,
             'description': self.simdata.get('description'),
-            'boxsize_Mpc': self.TNG300_1_boxsize,
+            'boxsize_kpc': self.sim_boxsize_kpc,
             'hubble_param': self.simdata.get('hubble'),
             'redshift': self.z,
             'scale_factor': self.a,
@@ -123,7 +129,7 @@ class GalaxyGroupData:
         self.list_of_galaxy_groups = list_of_galaxy_groups
     
     def correctTheData(self):
-        corrected_list_galaxy_groups = self.list_of_galaxy_groups.getCorrectedPositions(boxsize=self.TNG300_1_boxsize_kpc, parallelize=True, n_processes=4)
+        corrected_list_galaxy_groups = self.list_of_galaxy_groups.getCorrectedPositions(boxsize=self.sim_boxsize_kpc, parallelize=True, n_processes=4)
         print(f'After correcting, ListGalaxyGroup has {corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         
