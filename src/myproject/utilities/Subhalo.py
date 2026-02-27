@@ -69,7 +69,9 @@ class Subhalo:
         #  the dimension 12 corresponds to twelve different projection directions (i.e. observer view angles), since the dust attenuation mode is view-dependent. In general, one can simply take the first entry for each subhalo, or a random entry for each subhalo
    
     def getLuminositiesSDSS(self):
-        return (self.luminositiesSDSS[0][0],self.luminositiesSDSS[1][0],self.luminositiesSDSS[2][0],self.luminositiesSDSS[3][0],self.luminositiesSDSS[4][0],self.luminositiesSDSS[5][0],self.luminositiesSDSS[6][0],self.luminositiesSDSS[7][0])
+        # print(self.luminositiesSDSS, self.luminosities)
+        # return (self.luminositiesSDSS[0][0],self.luminositiesSDSS[1][0],self.luminositiesSDSS[2][0],self.luminositiesSDSS[3][0],self.luminositiesSDSS[4][0],self.luminositiesSDSS[5][0],self.luminositiesSDSS[6][0],self.luminositiesSDSS[7][0])
+        return self.luminositiesSDSS
 
     def getRbandMagnitude(self):
         return self.getLuminositiesSDSS()[5]#[0]

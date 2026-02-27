@@ -265,8 +265,11 @@ class GalaxyGroupData:
             print(SubhaloSDSSStellarPhotometrics.shape)
             # print(SubhaloStellarPhotometrics[0:5,:])
             # print(SubhaloVmaxRad.shape)
+        SubhaloSDSSStellarPhotometricsTrimmed = []
+        for sdss in SubhaloSDSSStellarPhotometrics:
+            SubhaloSDSSStellarPhotometricsTrimmed.append((sdss[0][0], sdss[1][0], sdss[2][0], sdss[3][0],sdss[4][0],sdss[5][0],sdss[6][0],sdss[7][0]))
             
-        return SubhaloSDSSStellarPhotometrics
+        return SubhaloSDSSStellarPhotometricsTrimmed
         
     def getGroupData(self, sim, snapshot):
         self.groupMCrit200 = self.getGroupMCrit200Data(sim, snapshot)

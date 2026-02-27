@@ -630,7 +630,7 @@ class AstroPlotter:
         return fig, ax
     
     def save_figure(self, fig: Figure, filename: str, 
-                   dpi: int = 300, 
+                   dpi: int = 600, 
                    format: Optional[str] = None,
                    transparent: bool = False,
                    **kwargs):
@@ -652,8 +652,16 @@ class AstroPlotter:
         **kwargs
             Additional arguments for savefig
         """
-        fig.savefig(filename, dpi=dpi, format=format, 
-                   transparent=transparent, **kwargs)
+        # fig.savefig(filename, dpi=dpi, format=format, 
+        #            transparent=transparent, **kwargs)
+        #save png and pdf versions
+        if format is None:
+            base_filename = filename.rsplit('.', 1)[0]
+            fig.savefig(f"{base_filename}.png", dpi=dpi, transparent=transparent, **kwargs)
+            fig.savefig(f"{base_filename}.pdf", dpi=dpi, transparent=transparent, **kwargs)
+        else:
+            fig.savefig(filename, dpi=dpi, format=format, transparent=transparent, **kwargs)
+
         print(f"Figure saved to: {filename}")
     
     def add_text_box(self, ax: Axes, text: str, 
