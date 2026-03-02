@@ -11,6 +11,8 @@ import h5py
 import os.path
 import os
 from dotenv import load_dotenv
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,11 +27,35 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
     Routine to pull data from online
     Credit to TNG team
     """
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        backoff_factor=2,          # waits 2, 4, 8, 16, 32s between retries
+        status_forcelist=[504, 503, 502, 500],
+        allowed_methods=["GET"]
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    session.headers.update(headers)
+
+    # r = requests.get('https://www.tng-project.org/api/TNG-Cluster/', headers=headers)
+    # print(r.status_code, r.json())
+
     print(f"Fetching data from {path} with params {params} and saving to {fName}")
     # make HTTP GET request to path
     if (len(headers['api-key'])!=32):
         print("Check your api key")
-    r = requests.get(path, params=params, headers=headers)
+    # else:
+    #     print(headers['api-key'])
+    # r = requests.get(path, params=params, headers=headers, timeout=120)
+    r = session.get(path, params=params, headers=headers, 
+                timeout=60, allow_redirects=False)
+
+    # If redirected, follow manually with auth header preserved
+    if r.status_code in (301, 302, 303, 307, 308):
+        redirect_url = r.headers['Location']
+        r = session.get(redirect_url,timeout=300)
     
     # print(f"Response code: {r.status_code}")
     # raise exception if response code is not HTTP SUCCESS (200)
@@ -163,7 +189,7 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
     """
 
     dataFile=fileName+'.hdf5'
-    
+
     if not os.path.exists(dataFile) or rewriteFile==1:
         url='http://www.tng-project.org/api/'+simulation+'/files/groupcat-'+str(snapshot)+'/?Subhalo='+field
         dataFile=get(url,fName=fileName)

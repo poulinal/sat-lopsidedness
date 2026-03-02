@@ -74,12 +74,15 @@ class GalaxyGroupData:
     def computeAllData(self):
         for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
+                if snapshot < 50:
+                    print(f"Skipping redshifts less than snapshot 50 aka redshift 1.5 due to smoothing length change, {snapshot}")
+                    continue
                 subhalo_id = None #placeholder since we will be fetching all subhalos
                 self.__init__(sim, snapshot)
                 print(f"New z: {self.z}")
                 self.getSubhaloData(sim, snapshot)
                 self.getGroupData(sim, snapshot)
-                list_of_galaxy_groups = self.getListGalaxyGroup()
+                self.getListGalaxyGroup()
                 self.correctTheData()
                 self.saveListGalaxyGroup()
                 print(f"Finished processing for sim: {sim}, snapshot: {snapshot} of index {i}/{len(self.snapshot_dic.keys())}")
@@ -129,7 +132,7 @@ class GalaxyGroupData:
         self.list_of_galaxy_groups = list_of_galaxy_groups
     
     def correctTheData(self):
-        corrected_list_galaxy_groups = self.list_of_galaxy_groups.getCorrectedPositions(boxsize=self.sim_boxsize_kpc, parallelize=True, n_processes=4)
+        corrected_list_galaxy_groups = self.list_of_galaxy_groups.getCorrectedPositions(boxsize=self.sim_boxsize_kpc, parallelize=True)
         print(f'After correcting, ListGalaxyGroup has {corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         
@@ -265,6 +268,8 @@ class GalaxyGroupData:
             print(SubhaloSDSSStellarPhotometrics.shape)
             # print(SubhaloStellarPhotometrics[0:5,:])
             # print(SubhaloVmaxRad.shape)
+            # low redshifts: sdss_u, sdss_g, sdss_r, sdss_i, sdss_z, wfc_acs_f606w, des_y, jwst_f150w
+            # high redshifts: sdss_u, sdss_g, sdss_r, sdss_i, sdss_z (at redshift 1.5 aka snapshot 40)
         SubhaloSDSSStellarPhotometricsTrimmed = []
         for sdss in SubhaloSDSSStellarPhotometrics:
             SubhaloSDSSStellarPhotometricsTrimmed.append((sdss[0][0], sdss[1][0], sdss[2][0], sdss[3][0],sdss[4][0],sdss[5][0],sdss[6][0],sdss[7][0]))

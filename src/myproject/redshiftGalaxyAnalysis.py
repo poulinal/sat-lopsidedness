@@ -13,7 +13,8 @@ class GalaxyAnalysis:
         self.snapshot = snapshot
         self.verbose = verbose
         self.generalRewrite = generalRewrite
-        self.snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0'), 40: (1.5, 'z1p5'), 33: (2.0, 'z2p0'), 25: (3.0, 'z3p0')}
+        # self.snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0'), 40: (1.5, 'z1p5'), 33: (2.0, 'z2p0'), 25: (3.0, 'z3p0')}
+        self.snapshot_dic = {99: (0, 'z0p0'), 91: (0.1, 'z0p1'), 84: (0.2, 'z0p2'), 78: (0.3, 'z0p3'), 72: (0.4, 'z0p4'), 67: (0.5, 'z0p5'), 59: (0.7, 'z0p7'), 50: (1.0, 'z1p0')}
         # possible_snapshots = list(snapshot_dic.keys())
         if self.sim == 'TNG300-1':
             self.L = 205*1e3 #kpc for TNG300
@@ -896,7 +897,7 @@ class GalaxyAnalysis:
             
         return prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax
         
-    def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
+    def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None, filename:str=''):
         overlayMRLPlotter = AstroPlotter()
         overlayMRLFig, overlayMRLAx = overlayMRLPlotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8*len(listGG), 6)) if len(listGG) > 1 else overlayMRLPlotter.create_figure()
         
@@ -1019,7 +1020,7 @@ class GalaxyAnalysis:
                 for n in range(max_raw_len):
                     f.write(f"{mrl_values_padded[n]}\t{random_mrl_values_padded[n]}\n")
         # overlayAxToPlot.legend()
-        overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}{self.plotEndingFormat}') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}{self.plotEndingFormat}')
+        overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{filename}_{self.plotIdentifier}{self.plotEndingFormat}') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{self.plotIdentifier}{self.plotEndingFormat}')
         
         #append into overall .txt file:
         with open(self.scratchPlotDirc + f'/MRL_values_and_random_comparison_overall.txt', 'a') as f:
@@ -1139,10 +1140,10 @@ class GalaxyAnalysis:
         # MRL_gt14_values = self.filtered_gt14_list_of_galaxy_groups.compute_probablity_distribution_of_MRL_directionality(parallelize=False)
         # random_MRL_values_gt14 = self.filtered_gt14_list_of_galaxy_groups.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=10000)
                             
-        self.overlayMRLAndMRLRandom([(self.filtered_gt14_list_of_galaxy_groups, '$M_{200}$>1e14 Msun')])
+        self.overlayMRLAndMRLRandom([(self.loaded_list_of_galaxy_groups, '$M_{200}$>1e13 Msun')], filename='gt13')
         
         #compute for each group (13-13.5, 13.5-14, 14-14.5, 14.5-15, >15)
-        self.overlayMRLAndMRLRandom([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '$13<M_{200}<13.5$'), (self.filtered_gt13p5_ls14_list_of_galaxy_groups, '$13.5<M_{200}<14$'), (self.filtered_gt14_ls14p5_list_of_galaxy_groups, '$14<M_{200}<14.5$'), (self.filtered_gt14p5_ls15_list_of_galaxy_groups, '$14.5<M_{200}<15$'), (self.filtered_gt15_list_of_galaxy_groups, '$M_{200}>15$')])
+        self.overlayMRLAndMRLRandom([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '$13<M_{200}<13.5$'), (self.filtered_gt13p5_ls14_list_of_galaxy_groups, '$13.5<M_{200}<14$'), (self.filtered_gt14_ls14p5_list_of_galaxy_groups, '$14<M_{200}<14.5$'), (self.filtered_gt14p5_ls15_list_of_galaxy_groups, '$14.5<M_{200}<15$'), (self.filtered_gt15_list_of_galaxy_groups, '$M_{200}>15$')], filename='by_mass')
 
     #for each group, plot the probability distribution of a galaxy group's M200
     def M200DistributionPlots(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
@@ -1316,6 +1317,8 @@ class GalaxyAnalysis:
         totalSatellites = sum(gg.getNumSubhalos() for listGalaxyGroup, _ in listGG for gg in listGalaxyGroup.getAllGalaxyGroups())
         processedSatelliteIds = []
         print(f"Total number of satellites to process: {totalSatellites}")
+
+        processedJoinTimes = []
         
         satellitesWihtoutMergerTree = []
         #load satellitesWihtoutMergerTree from file if exists
@@ -1362,8 +1365,6 @@ class GalaxyAnalysis:
                                 print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
                                 join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
                                 processedSatelliteIds.append(subhalo.getIdx())
-                                if i == 0:
-                                    print(f"jointime: {join_time_info[0]}")
                                 if join_time_info is None:
                                     print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
                                     satellitesWihtoutMergerTree.append(subhalo.getIdx())
@@ -1372,7 +1373,10 @@ class GalaxyAnalysis:
                                         g.write(f"{subhalo.getIdx()}\n")
                                     continue
                                 f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
-        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}")
+                                processedJoinTimes.append(join_time_info[0])
+                                if i == 0:
+                                    print(f"jointime: {join_time_info[0]}")
+        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
 
     #plot the distribution of joining redshifts for each mass bin
     def plot_joining_redshift_distribution_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]]):

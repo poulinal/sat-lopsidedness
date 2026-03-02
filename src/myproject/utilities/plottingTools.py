@@ -267,6 +267,8 @@ class AstroPlotter:
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
+            if len(title) > 50:  # If title is long, create a new line for better formatting
+                title = title[:50] + '\n' + title[50:]
             ax.set_title(title)
         if label and not spline_curvature:
             sc.set_label(label)
@@ -457,6 +459,8 @@ class AstroPlotter:
             ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel or ylabel_text)
         if title:
+            if len(title) > 50:  # If title is long, create a new line for better formatting
+                title = title[:50] + '\n' + title[50:]
             ax.set_title(title)
         
         # Legend
@@ -547,6 +551,8 @@ class AstroPlotter:
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
+            if len(title) > 50:  # If title is long, create a new line for better formatting
+                title = title[:50] + '\n' + title[50:]
             ax.set_title(title)
         
         # Colorbar
@@ -619,6 +625,8 @@ class AstroPlotter:
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
+            if len(title) > 50:  # If title is long, create a new line for better formatting
+                title = title[:50] + '\n' + title[50:]
             ax.set_title(title)
         
         # Colorbar
@@ -654,11 +662,10 @@ class AstroPlotter:
         """
         # fig.savefig(filename, dpi=dpi, format=format, 
         #            transparent=transparent, **kwargs)
-        #save png and pdf versions
-        if format is None:
-            base_filename = filename.rsplit('.', 1)[0]
-            fig.savefig(f"{base_filename}.png", dpi=dpi, transparent=transparent, **kwargs)
-            fig.savefig(f"{base_filename}.pdf", dpi=dpi, transparent=transparent, **kwargs)
+        #save png and pdf versions if doesnt end in .png or .pdf
+        if not filename.endswith('.png') and not filename.endswith('.pdf'):
+            fig.savefig(filename + '.png', dpi=dpi, format='png', transparent=transparent, **kwargs)
+            fig.savefig(filename + '.pdf', dpi=dpi, format='pdf', transparent=transparent, **kwargs)
         else:
             fig.savefig(filename, dpi=dpi, format=format, transparent=transparent, **kwargs)
 
@@ -705,6 +712,14 @@ class AstroPlotter:
         
         if loc == 'center':
             ha, va = 'center', 'center'
+
+        #if text too big, decrease fontsize and add new lines for better formatting
+        if len(text) > 50:
+            if fontsize is None:
+                fontsize = 10
+            else:
+                fontsize = max(fontsize - 2, 8)
+            # text = text[:50] + '\n' + text[50:]
         
         ax.text(xy[0], xy[1], text, transform=ax.transAxes,
                fontsize=fontsize, bbox=props, ha=ha, va=va)
