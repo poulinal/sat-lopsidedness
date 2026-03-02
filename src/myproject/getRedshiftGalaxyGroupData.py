@@ -71,7 +71,7 @@ class GalaxyGroupData:
         self.list_of_galaxy_groups = None
         self.filtered_and_corrected_list_of_galaxy_groups = None
         
-    def computeAllData(self):
+    def computeAllData(self, additionalFileIdentifier:str=''):
         for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
                 if snapshot < 50:
@@ -84,7 +84,7 @@ class GalaxyGroupData:
                 self.getGroupData(sim, snapshot)
                 self.getListGalaxyGroup()
                 self.correctTheData()
-                self.saveListGalaxyGroup()
+                self.saveListGalaxyGroup(additionalFileIdentifier)
                 print(f"Finished processing for sim: {sim}, snapshot: {snapshot} of index {i}/{len(self.snapshot_dic.keys())}")
                 
     def getListGalaxyGroup(self):
@@ -136,13 +136,14 @@ class GalaxyGroupData:
         print(f'After correcting, ListGalaxyGroup has {corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         
-        self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, M_r_max=-15, satWithinR200=True, parallelize=True)
+        # self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, M_r_max=-15, satWithinR200=True, parallelize=True)
+        self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, satWithinR200=True, parallelize=True)
         print(f'After filtering, ListGalaxyGroup has {self.filtered_and_corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {self.filtered_and_corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         print(f' Range of satellites: {self.filtered_and_corrected_list_galaxy_groups.getRangeOfNumSubhalos()}')
         
-    def saveListGalaxyGroup(self):
-        output_filename = self.scratchDataDirc + f'/galaxy_data_{self.sim}.hdf5'
+    def saveListGalaxyGroup(self, additionalFileIdentifier:str=''):
+        output_filename = self.scratchDataDirc + f'/galaxy_data_{self.sim}_{additionalFileIdentifier}.hdf5'
         with h5.File(output_filename, 'w') as f:
             # list_of_galaxy_groups.save_to_hdf5(f)
             self.filtered_and_corrected_list_galaxy_groups.save_to_hdf5(f, parallize=True)

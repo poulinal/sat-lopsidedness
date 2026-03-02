@@ -78,6 +78,12 @@ class Subhalo:
     
     def getGbandMagnitude(self):
         return self.getLuminositiesSDSS()[4]#[0]
+
+    def getDefaultRbandMagnitude(self):
+        return self.getLuminosities()[5]#[0]
+    
+    def getDefaultGbandMagnitude(self):
+        return self.getLuminosities()[4]#[0]
     
     def getDistanceToGroupCenter(self):
         return self.distanceToGroupCenter

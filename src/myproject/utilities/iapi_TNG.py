@@ -22,12 +22,22 @@ api_key = os.getenv("API_KEY")
 baseUrl = 'http://www.tng-project.org/api/'
 headers = {"api-key" : api_key}
 
+class _TNGSession(requests.Session):
+    """Custom session that strips the api-key header when redirected to a different domain."""
+    def rebuild_auth(self, prepared_request, response):
+        from urllib.parse import urlparse
+        original_host = urlparse(response.request.url).netloc
+        new_host = urlparse(prepared_request.url).netloc
+        if original_host != new_host and 'tng-project.org' not in new_host:
+            prepared_request.headers.pop('api-key', None)
+
+
 def get(path, params=None, fName='temp'): # gets data from url, saves to file
     """
     Routine to pull data from online
     Credit to TNG team
     """
-    session = requests.Session()
+    session = _TNGSession()
     retry = Retry(
         total=5,
         backoff_factor=2,          # waits 2, 4, 8, 16, 32s between retries
@@ -39,23 +49,13 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
     session.mount("https://", adapter)
     session.headers.update(headers)
 
-    # r = requests.get('https://www.tng-project.org/api/TNG-Cluster/', headers=headers)
-    # print(r.status_code, r.json())
-
     print(f"Fetching data from {path} with params {params} and saving to {fName}")
-    # make HTTP GET request to path
     if (len(headers['api-key'])!=32):
         print("Check your api key")
-    # else:
-    #     print(headers['api-key'])
-    # r = requests.get(path, params=params, headers=headers, timeout=120)
-    r = session.get(path, params=params, headers=headers, 
-                timeout=60, allow_redirects=False)
 
-    # If redirected, follow manually with auth header preserved
-    if r.status_code in (301, 302, 303, 307, 308):
-        redirect_url = r.headers['Location']
-        r = session.get(redirect_url,timeout=300)
+    # Use allow_redirects=True: _TNGSession.rebuild_auth() will strip api-key
+    # when redirecting to data-eu.tng-project.org (which uses a token in the URL)
+    r = session.get(path, params=params, timeout=300, allow_redirects=True)
     
     # print(f"Response code: {r.status_code}")
     # raise exception if response code is not HTTP SUCCESS (200)
@@ -81,7 +81,7 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
 def getsub(snapnum,subid):
     #Pull fields associated with a given subhalo at a given snapshot
     url= 'https://www.tng-project.org/api/TNG100-1/snapshots/'+str(snapnum)+'/subhalos/'+str(subid)+'/'
-    sub=iapi.get(url)
+    sub=get(url)
     return(sub)
 
 def gettree(snapnum,subid):

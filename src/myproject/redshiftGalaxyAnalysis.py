@@ -8,7 +8,7 @@ from typing import Optional
 import os
 
 class GalaxyAnalysis:
-    def __init__(self, sim : str = 'TNG300-1', snapshot : int = 99, generalRewrite: bool = False, verbose : bool = False, generalErrorbar:str='poisson'):
+    def __init__(self, sim : str = 'TNG300-1', snapshot : int = 99, generalRewrite: bool = False, verbose : bool = False, generalErrorbar:str='poisson', luminosityType:str='SDSS'):
         self.sim = sim
         self.snapshot = snapshot
         self.verbose = verbose
@@ -31,7 +31,7 @@ class GalaxyAnalysis:
 
         self.generalErrorbar = generalErrorbar
         
-        self.load_galaxy_groups()
+        self.load_galaxy_groups(luminosityType)
         self.initializeMassSubgroups()
 
         
@@ -59,14 +59,14 @@ class GalaxyAnalysis:
         self.scratchPlotDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/plots'
         self.localDataDirc = f'/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/TGB–Data'
 
-    def load_galaxy_groups(self):
-        data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}.hdf5'
+    def load_galaxy_groups(self, luminosityType:str='SDSS'):
+        data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}_.hdf5'
         # data_file = localDataDirc + f'/galaxy_data_{sim}.hdf5'
         with h5.File(data_file, 'r') as f:
             self.loaded_list_of_galaxy_groups = ListGalaxyGroup.from_hdf5(f)
         print(f'Loaded galaxy data from {data_file}')
         # print(f"len filtered: {len(filtered_galaxy_groups)}")
-        self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14)
+        self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14, M_r_min=-15) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14, M_default_r_min=-15)
         return self.loaded_list_of_galaxy_groups
     
     def load_galaxy_groups_for_snapshot_sim(self, snapshot:int, sim:str):
@@ -1363,7 +1363,7 @@ class GalaxyAnalysis:
                                     print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
                                     continue
                                 print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
-                                join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getGroupID(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
+                                join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getIdx(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
                                 processedSatelliteIds.append(subhalo.getIdx())
                                 if join_time_info is None:
                                     print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
@@ -1376,14 +1376,14 @@ class GalaxyAnalysis:
                                 processedJoinTimes.append(join_time_info[0])
                                 if i == 0:
                                     print(f"jointime: {join_time_info[0]}")
-        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
+        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}, expected: {totalSatellites}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
 
     #plot the distribution of joining redshifts for each mass bin
     def plot_joining_redshift_distribution_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]]):
         joining_redshift_plotter = AstroPlotter()
         joining_redshift_fig, joining_redshift_ax = joining_redshift_plotter.create_figure()
         
-        self.get_satellite_join_time(listGG)
+        self.get_satellite_join_time(listGG, rewrite=self.generalRewrite)
         
         #load the join times from the files and plot the distribution of joining redshifts for each mass bin
         for listGalaxyGroup, label in listGG:
@@ -1395,7 +1395,7 @@ class GalaxyAnalysis:
                     if len(parts) > 3:
                         join_time_info = [float(x) for x in parts[3:]]  # Extract joining redshift and other info
                         joining_redshifts.append(join_time_info[0])
-            print(f"joining redshifts: {joining_redshifts}")
+            print(f"joining redshifts: num non nans:{len(np.where(np.isfinite(joining_redshifts)))} / {len(joining_redshifts)}, {joining_redshifts}")
             
             # joining_redshift_bins, joining_redshift_bin_edges, joining_redshift_errorbars = ListGalaxyGroup.get_histogram_bins(joining_redshifts, bins='auto', errorbarType='poisson')
             
