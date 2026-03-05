@@ -61,12 +61,16 @@ class GalaxyAnalysis:
 
     def load_galaxy_groups(self, luminosityType:str='SDSS'):
         data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}_.hdf5'
+        # data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}.hdf5' #original
         # data_file = localDataDirc + f'/galaxy_data_{sim}.hdf5'
         with h5.File(data_file, 'r') as f:
-            self.loaded_list_of_galaxy_groups = ListGalaxyGroup.from_hdf5(f)
+            self.loaded_list_of_galaxy_groupsRaw = ListGalaxyGroup.from_hdf5(f)
         print(f'Loaded galaxy data from {data_file}')
-        # print(f"len filtered: {len(filtered_galaxy_groups)}")
-        self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14, M_r_min=-15) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14, M_default_r_min=-15)
+        
+        self.loaded_list_of_galaxy_groups = self.loaded_list_of_galaxy_groupsRaw.getFilterSubhalos(minGGMass=1e13, M_r_max=-15) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groupsRaw.getFilterSubhalos(minGGMass=1e13, M_default_r_max=-15)
+
+        self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14)
+
         return self.loaded_list_of_galaxy_groups
     
     def load_galaxy_groups_for_snapshot_sim(self, snapshot:int, sim:str):
@@ -253,7 +257,7 @@ class GalaxyAnalysis:
             loc='bottom center'
         )
         color_plotter.save_figure(color_fig,
-            self.scratchPlotDirc + f'/color_distribution/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}'
+            self.scratchPlotDirc + f'/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}'
         )
         return intersection_point, intersection_point_valid
     
@@ -897,7 +901,7 @@ class GalaxyAnalysis:
             
         return prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax
         
-    def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None, filename:str=''):
+    def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None, filename:str='', percentageMRL:float = 0.99*100):
         overlayMRLPlotter = AstroPlotter()
         overlayMRLFig, overlayMRLAx = overlayMRLPlotter.create_figure(ncols=len(listGG), nrows=1, figsize=(8*len(listGG), 6)) if len(listGG) > 1 else overlayMRLPlotter.create_figure()
         
@@ -933,8 +937,8 @@ class GalaxyAnalysis:
                 grid=True
             )
             #plot a small verticle line at 99th percentile of radnom MRL_values
-            percentile_99_MRL = np.percentile(random_MRL_values, 99)
-            # overlayMRLAx.axvline(percentile_99_MRL, linestyle='--', label=f'99th Percentile')
+            percentile_MRL = np.percentile(random_MRL_values, percentageMRL)
+            # overlayMRLAx.axvline(percentile_MRL, linestyle='--', label=f'99th Percentile')
 
             overlayMRLPlotter.scatter_plot(
                 random_MRL_bin_centers, 
@@ -969,13 +973,15 @@ class GalaxyAnalysis:
                 spline_curvature=True,
                 spline_smoothing=0,
             )
-            print(f"99th percentile MRL: {percentile_99_MRL}")
-            print(f"Overall number of MRL values above 99th percentile: {np.sum(np.array(MRL_values) > percentile_99_MRL)} out of {len(MRL_values)}")
+            ymin, ymax = overlayAxToPlot.get_ylim()
+            overlayAxToPlot.plot([percentile_MRL, percentile_MRL], [ymin, ymax*0.1], color='blue', linestyle='--', label=f'{str(percentile_MRL)}th Percentile (20 Non-Centrals)')
+            print(f"99th percentile MRL: {percentile_MRL}")
+            print(f"Overall number of MRL values above 99th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
             
-            print(f"len listGG: {len(listGG)}, len MRL_values: {len(MRL_values)}, len random_MRL_values: {len(random_MRL_values)}")
+            # print(f"len listGG: {len(listGG)}, len MRL_values: {len(MRL_values)}, len random_MRL_values: {len(random_MRL_values)}")
             #include a text box in the plot with the fraction of MRL values that are less than the 99th percentile of random MRL values
-            fraction_less_than_99th_percentile = np.sum(np.array(MRL_values) < percentile_99_MRL) / len(MRL_values)
-            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < 99th percentile of random MRL: {fraction_less_than_99th_percentile:.2f}", loc='bottom center')
+            fraction_less_than_nth_percentile = np.sum(np.array(MRL_values) < percentile_MRL) / len(MRL_values)
+            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.2f}", loc='bottom center')
             
             # save into .txt file:
             # In table: galaxy id, num of members, mass of cluster, MRL value of that projection, fraction less than the MRL I measured
@@ -1374,8 +1380,8 @@ class GalaxyAnalysis:
                                     continue
                                 f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
                                 processedJoinTimes.append(join_time_info[0])
-                                if i == 0:
-                                    print(f"jointime: {join_time_info[0]}")
+                                # if i == 0:
+                                    # print(f"jointime: {join_time_info[0]}")
         print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}, expected: {totalSatellites}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
 
     #plot the distribution of joining redshifts for each mass bin
@@ -1412,6 +1418,7 @@ class GalaxyAnalysis:
                 # ylim = (0, 0.01),
                 label=f"{label}",
                 output_filename=None,
+                ylog=True,
                 grid=True,
             )
         joining_redshift_ax.legend()

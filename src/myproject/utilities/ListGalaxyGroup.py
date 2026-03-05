@@ -144,7 +144,7 @@ class ListGalaxyGroup:
                 
                 #check existing temp files to resume
                 existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("pairwise_differences_") and f.endswith(".hdf5")]
-                if existing_files:
+                if existing_files and not rewrite:
                     #get the index of each file
                     existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
                     last_file = existing_files[-1]
@@ -297,7 +297,7 @@ class ListGalaxyGroup:
                 batch_MRL_values = []
                 #check existing temp files to resume
                 existing_files = [f for f in os.listdir(tempSaveDir) if f.startswith("MRL_values_") and f.endswith(".hdf5")]
-                if existing_files:
+                if existing_files and not rewrite:
                     #get the index of each file
                     existing_files.sort(key=lambda x: int(x.split('_')[2].split('.')[0]))
                     last_file = existing_files[-1]

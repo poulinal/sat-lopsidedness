@@ -703,14 +703,15 @@ class AstroPlotter:
             'lower left': (0.05, 0.05),
             'center': (0.5, 0.5),
             'outside upper right': (1.05, 0.95),
-            'bottom center': (0.5, -0.12),
+            # 'bottom center': (0.5, -0.12),
+            'bottom center': (0.5, -0.18),
         }
         
         xy = loc_dict.get(loc, (0.95, 0.95))
         ha = 'right' if 'right' in loc else 'left'
         va = 'top' if 'upper' in loc else 'bottom'
         
-        if loc == 'center':
+        if loc == 'center' or loc == 'bottom center':
             ha, va = 'center', 'center'
 
         #if text too big, decrease fontsize and add new lines for better formatting

@@ -9,6 +9,7 @@ import requests
 import numpy as np
 import h5py
 import os.path
+import time
 import os
 from dotenv import load_dotenv
 from urllib3.util.retry import Retry
@@ -19,7 +20,7 @@ load_dotenv()
 
 api_key = os.getenv("API_KEY")
 
-baseUrl = 'http://www.tng-project.org/api/'
+baseUrl = 'https://www.tng-project.org/api/'
 headers = {"api-key" : api_key}
 
 class _TNGSession(requests.Session):
@@ -31,40 +32,94 @@ class _TNGSession(requests.Session):
         if original_host != new_host and 'tng-project.org' not in new_host:
             prepared_request.headers.pop('api-key', None)
 
+# def get(path, params=None, fName='temp'): # gets data from url, saves to file
+    # """
+    # Routine to pull data from online
+    # Credit to TNG team
+    # """
+    # session = _TNGSession()
+    # retry = Retry(
+    #     total=5,
+    #     backoff_factor=2,          # waits 2, 4, 8, 16, 32s between retries
+    #     status_forcelist=[504, 503, 502, 500],
+    #     allowed_methods=["GET"]
+    # )
+    # adapter = HTTPAdapter(max_retries=retry)
+    # session.mount("http://", adapter)
+    # session.mount("https://", adapter)
+    # session.headers.update(headers)
+
+    # # print(f"Fetching data from {path} with params {params} and saving to {fName}")
+    # if (len(headers['api-key'])!=32):
+    #     print("Check your api key")
+
+    # # Use allow_redirects=True: _TNGSession.rebuild_auth() will strip api-key
+    # # when redirecting to data-eu.tng-project.org (which uses a token in the URL)
+    # r = session.get(path, params=params, timeout=300, allow_redirects=True)
+    
+    # # print(f"Response code: {r.status_code}")
+    # # raise exception if response code is not HTTP SUCCESS (200)
+    # r.raise_for_status()
+
+    # if r.headers['content-type'] == 'application/json':
+    #     return r.json() # parse json responses automatically
+
+    # # print(f"Saving data to {fName}")
+    # dataFile=fName+'.hdf5'
+    # # Saves to file, currently disabled
+    # # print(r.headers)
+    # if 'content-disposition' in r.headers:
+    #     filename = r.headers['content-disposition'].split("filename=")[1]
+    #     with open(dataFile, 'wb') as f:
+    #         f.write(r.content)
+    #     return dataFile # return the filename string
+
+    # # print(f"Saving data to {dataFile} where r: {r}")
+    # return r
 
 def get(path, params=None, fName='temp'): # gets data from url, saves to file
     """
     Routine to pull data from online
     Credit to TNG team
     """
-    session = _TNGSession()
-    retry = Retry(
-        total=5,
-        backoff_factor=2,          # waits 2, 4, 8, 16, 32s between retries
-        status_forcelist=[504, 503, 502, 500],
-        allowed_methods=["GET"]
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    session.headers.update(headers)
-
     print(f"Fetching data from {path} with params {params} and saving to {fName}")
+
+    # r = requests.get('https://www.tng-project.org/api/', headers=headers)
+    # print(r.status_code)  # should be 200
+
+    # make HTTP GET request to path
     if (len(headers['api-key'])!=32):
         print("Check your api key")
-
-    # Use allow_redirects=True: _TNGSession.rebuild_auth() will strip api-key
-    # when redirecting to data-eu.tng-project.org (which uses a token in the URL)
-    r = session.get(path, params=params, timeout=300, allow_redirects=True)
+    r = requests.get(path, params=params, headers=headers)
+    # r = requests.get(path, params=params, headers=headers, allow_redirects=False, timeout=120)
+    # print(f"firrst r.statuscode: {r.status_code}")
     
-    # print(f"Response code: {r.status_code}")
+    # # Follow redirects manually, forcing US mirror
+    # while r.status_code in (301, 302, 303, 307, 308, 504):
+    #     print(f"r.headers['Location']: {r.headers['Location']}")
+    #     # redirect_url = r.headers['Location'].replace(
+    #     #     'data-eu.tng-project.org', 'data.tng-project.org'  # force US node
+    #     # )
+    #     redirect_url = r.headers['Location']  # keep EU url as-is
+    #     print(f"Redirecting to: {redirect_url}")
+    #     time.sleep(5)
+    #     # r = requests.get(redirect_url, headers=headers, allow_redirects=False, timeout=120)
+    #     r = requests.get(redirect_url, headers=headers, allow_redirects=False, 
+                #  timeout=120, proxies={"https": None, "http": None})
+        
+
+    
+    print(f"Response code: {r.status_code}")
     # raise exception if response code is not HTTP SUCCESS (200)
     r.raise_for_status()
 
     if r.headers['content-type'] == 'application/json':
-        return r.json() # parse json responses automatically
+        response = r.json()
+        print(f"JSON response: {response}")  # <-- add this
+        return response
+        # return r.json() # parse json responses automatically
 
-    # print(f"Saving data to {fName}")
+    print(f"Saving data to {fName}")
     dataFile=fName+'.hdf5'
     # Saves to file, currently disabled
     print(r.headers)
@@ -74,7 +129,7 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
             f.write(r.content)
         return dataFile # return the filename string
 
-    # print(f"Saving data to {dataFile} where r: {r}")
+    print(f"Saving data to {dataFile} where r: {r}")
     return r
 
 
@@ -190,8 +245,9 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
 
     dataFile=fileName+'.hdf5'
 
+    print(f"doesn't exist: {not os.path.exists(dataFile)} or {rewriteFile==1}, datafile: {dataFile}")
     if not os.path.exists(dataFile) or rewriteFile==1:
-        url='http://www.tng-project.org/api/'+simulation+'/files/groupcat-'+str(snapshot)+'/?Subhalo='+field
+        url='https://www.tng-project.org/api/'+simulation+'/files/groupcat-'+str(snapshot)+'/?Subhalo='+field
         dataFile=get(url,fName=fileName)
         
     with h5py.File(dataFile,'r') as f:
