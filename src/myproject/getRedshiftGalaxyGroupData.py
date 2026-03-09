@@ -132,6 +132,7 @@ class GalaxyGroupData:
         self.list_of_galaxy_groups = list_of_galaxy_groups
     
     def correctTheData(self):
+        print(f"WARNING.... double check: Correcting positions with boxsize: {self.sim_boxsize_kpc}")
         corrected_list_galaxy_groups = self.list_of_galaxy_groups.getCorrectedPositions(boxsize=self.sim_boxsize_kpc, parallelize=True)
         print(f'After correcting, ListGalaxyGroup has {corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')

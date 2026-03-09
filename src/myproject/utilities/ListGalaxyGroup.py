@@ -603,7 +603,7 @@ class ListGalaxyGroup:
         print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
 
     @staticmethod
-    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> List[tuple[np.ndarray, np.ndarray]]:
         '''
         Docstring for compute_an_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
         
@@ -666,8 +666,9 @@ class ListGalaxyGroup:
             bin='auto'  # Default to 'auto' if no valid binning parameters provided
         hist, bin_edges = np.histogram(values, bins=bin, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        bin_widths = bin_edges[1:] - bin_edges[:-1] #need bin widths to properly normalize poisson errors when density=True
         if errorbarType == 'poisson':
-            errorbars = np.sqrt(hist / len(values))  # Poisson errors normalized to density
+            errorbars = np.sqrt(hist / (len(values) * bin_widths))  # Poisson errors normalized to density
         elif errorbarType == 'bootstrap':
             n_bootstrap = 1000
             bootstrap_histograms = []
