@@ -14,6 +14,7 @@ import os
 from dotenv import load_dotenv
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
+from urllib.parse import urlparse, urljoin
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,59 +24,43 @@ api_key = os.getenv("API_KEY")
 baseUrl = 'https://www.tng-project.org/api/'
 headers = {"api-key" : api_key}
 
-class _TNGSession(requests.Session):
-    """Custom session that strips the api-key header when redirected to a different domain."""
-    def rebuild_auth(self, prepared_request, response):
-        from urllib.parse import urlparse
-        original_host = urlparse(response.request.url).netloc
-        new_host = urlparse(prepared_request.url).netloc
-        if original_host != new_host and 'tng-project.org' not in new_host:
-            prepared_request.headers.pop('api-key', None)
+TIMEOUT = 600
+MAX_RETRIES = 5
+BACKOFF_FACTOR = 10  # seconds
 
-# def get(path, params=None, fName='temp'): # gets data from url, saves to file
-    # """
-    # Routine to pull data from online
-    # Credit to TNG team
-    # """
-    # session = _TNGSession()
-    # retry = Retry(
-    #     total=5,
-    #     backoff_factor=2,          # waits 2, 4, 8, 16, 32s between retries
-    #     status_forcelist=[504, 503, 502, 500],
-    #     allowed_methods=["GET"]
-    # )
-    # adapter = HTTPAdapter(max_retries=retry)
-    # session.mount("http://", adapter)
-    # session.mount("https://", adapter)
-    # session.headers.update(headers)
+def tng_get(url, stream=False):
+    """GET request with manual redirect handling for TNG API."""
+    from urllib.parse import urlparse, urljoin
+    for attempt in range(MAX_RETRIES):
+        try:
+            r = requests.get(url, headers=headers, allow_redirects=False, timeout=TIMEOUT)
 
-    # # print(f"Fetching data from {path} with params {params} and saving to {fName}")
-    # if (len(headers['api-key'])!=32):
-    #     print("Check your api key")
+            # Handle redirects
+            while r.status_code in (301, 302, 303, 307, 308):
+                redirect_url = r.headers["Location"]
+                if not urlparse(redirect_url).scheme:
+                    redirect_url = urljoin(url, redirect_url)
 
-    # # Use allow_redirects=True: _TNGSession.rebuild_auth() will strip api-key
-    # # when redirecting to data-eu.tng-project.org (which uses a token in the URL)
-    # r = session.get(path, params=params, timeout=300, allow_redirects=True)
-    
-    # # print(f"Response code: {r.status_code}")
-    # # raise exception if response code is not HTTP SUCCESS (200)
-    # r.raise_for_status()
+                # Strip api-key for data server redirects (token is in URL)
+                hostname = urlparse(redirect_url).hostname or ""
+                if "data" in hostname:
+                    r = requests.get(redirect_url, timeout=TIMEOUT, stream=stream)
+                else:
+                    r = requests.get(redirect_url, headers=headers,
+                                     timeout=TIMEOUT, stream=stream)
 
-    # if r.headers['content-type'] == 'application/json':
-    #     return r.json() # parse json responses automatically
+            r.raise_for_status()
+            return r
 
-    # # print(f"Saving data to {fName}")
-    # dataFile=fName+'.hdf5'
-    # # Saves to file, currently disabled
-    # # print(r.headers)
-    # if 'content-disposition' in r.headers:
-    #     filename = r.headers['content-disposition'].split("filename=")[1]
-    #     with open(dataFile, 'wb') as f:
-    #         f.write(r.content)
-    #     return dataFile # return the filename string
-
-    # # print(f"Saving data to {dataFile} where r: {r}")
-    # return r
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
+            status = getattr(e.response, "status_code", None) if hasattr(e, "response") else None
+            if status in (502, 503, 504) or isinstance(e, requests.exceptions.Timeout):
+                wait = BACKOFF_FACTOR * (2 ** attempt)
+                print(f"  Attempt {attempt+1}/{MAX_RETRIES} failed ({e}). Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"Failed after {MAX_RETRIES} retries: {url}")
 
 def get(path, params=None, fName='temp'): # gets data from url, saves to file
     """
@@ -90,27 +75,25 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
     # make HTTP GET request to path
     if (len(headers['api-key'])!=32):
         print("Check your api key")
-    r = requests.get(path, params=params, headers=headers)
-    # r = requests.get(path, params=params, headers=headers, allow_redirects=False, timeout=120)
-    # print(f"firrst r.statuscode: {r.status_code}")
-    
-    # # Follow redirects manually, forcing US mirror
-    # while r.status_code in (301, 302, 303, 307, 308, 504):
-    #     print(f"r.headers['Location']: {r.headers['Location']}")
-    #     # redirect_url = r.headers['Location'].replace(
-    #     #     'data-eu.tng-project.org', 'data.tng-project.org'  # force US node
-    #     # )
-    #     redirect_url = r.headers['Location']  # keep EU url as-is
-    #     print(f"Redirecting to: {redirect_url}")
-    #     time.sleep(5)
-    #     # r = requests.get(redirect_url, headers=headers, allow_redirects=False, timeout=120)
-    #     r = requests.get(redirect_url, headers=headers, allow_redirects=False, 
-                #  timeout=120, proxies={"https": None, "http": None})
-        
+    r = requests.get(path, params=params, headers=headers, timeout=50000)
+    # print(f"Response code: {r.status_code}")
+    # r.raise_for_status()
 
-    
-    print(f"Response code: {r.status_code}")
-    # raise exception if response code is not HTTP SUCCESS (200)
+    # r = requests.get(path, params=params, headers=headers, allow_redirects=False, timeout=1020)
+    # # Handle redirects manually
+    # while r.status_code in (301, 302, 303, 307, 308):
+    #     from urllib.parse import urlparse, urljoin
+    #     redirect_url = r.headers['Location']
+    #     if not urlparse(redirect_url).scheme:
+    #         redirect_url = urljoin(path, redirect_url)
+
+    #     # Only strip api-key header if redirected to a data server (token is in URL)
+    #     if 'data' in urlparse(redirect_url).hostname:
+    #         redirect_url = redirect_url.replace('data-us.tng-project.org', 'data-eu.tng-project.org')
+    #         r = requests.get(redirect_url, timeout=300)
+    #     else:
+    #         r = requests.get(redirect_url, headers=headers, timeout=120)  # keep headers
+
     r.raise_for_status()
 
     if r.headers['content-type'] == 'application/json':
@@ -170,7 +153,7 @@ def getredshift(snapnum, simname):
 
 
 def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
-                    fileName='tempCat', rewriteFile=0):
+                    fileName='tempCat', rewriteFile=0, saveFile:bool=False):
     """
     Credit to TNG team
     Data from one field for all subhalos in a given snapshot      
@@ -248,10 +231,29 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
     print(f"doesn't exist: {not os.path.exists(dataFile)} or {rewriteFile==1}, datafile: {dataFile}")
     if not os.path.exists(dataFile) or rewriteFile==1:
         url='https://www.tng-project.org/api/'+simulation+'/files/groupcat-'+str(snapshot)+'/?Subhalo='+field
-        dataFile=get(url,fName=fileName)
+
+        try:
+            print("tring to access api field")
+            dataFile=get(url,fName=fileName)
+
+            with h5py.File(dataFile,'r') as f:
+                data=np.array(f['Subhalo'][field])
+        except:
+            print("instead accessing groupcat")
+            try:
+                data = extract_field(chunk_dir, snapshot, group='Subhalo', field=field)
+            except:
+                print("need to download all chunks first")
+                datacatalogFolder = os.path.dirname(os.path.dirname(dataFile))
+                chunk_dir = download_all_chunks(simulation, snapshot, datacatalogFolder)
+                print(f"\nAll chunks saved to: {chunk_dir}")
+                data = extract_field(chunk_dir, snapshot, group='Subhalo', field=field)
+                print(f"retrieved field")
+
+                if saveFile:
+                    savepath = fileName
+                    save_field(data, field, savepath)
         
-    with h5py.File(dataFile,'r') as f:
-        data=np.array(f['Subhalo'][field])
 
     return data
     
@@ -371,3 +373,124 @@ def getSubcutout(subID, parttype, params, sim='TNG100-1', snapnum='99', fName='t
     return(cutout)
 
 
+
+def list_groupcat_chunks(sim, snap):
+    """List all groupcat chunk files for a simulation/snapshot."""
+    url = f"{baseUrl}{sim}/files/groupcat-{snap}/"
+    print(f"Listing groupcat chunks: {url}")
+    r = tng_get(url)
+    data = r.json()
+    # The response contains a list of file URLs
+    if isinstance(data, list):
+        return data
+    elif isinstance(data, dict) and "files" in data:
+        return data["files"]
+    else:
+        # Try to find chunk URLs from the response
+        print(f"Unexpected response format, keys: {data.keys() if isinstance(data, dict) else type(data)}")
+        print(f"Response: {data}")
+        return data
+
+
+def download_chunk(chunk_url, outpath):
+    """Download a single groupcat chunk to disk."""
+    if os.path.exists(outpath):
+        print(f"  Already exists: {outpath}, skipping")
+        return outpath
+
+    print(f"  Downloading: {chunk_url}")
+    r = tng_get(chunk_url, stream=True)
+
+    with open(outpath, "wb") as f:
+        for block in r.iter_content(chunk_size=1024 * 1024):
+            f.write(block)
+
+    print(f"  Saved: {outpath} ({os.path.getsize(outpath) / 1e6:.1f} MB)")
+    return outpath
+
+
+def download_all_chunks(sim, snap, outdir):
+    """Download all groupcat chunks for a simulation/snapshot."""
+    chunk_dir = os.path.join(outdir, f"{sim}_groupcat_{snap}")
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    chunks_info = list_groupcat_chunks(sim, snap)
+
+    # Determine chunk count and URLs
+    chunk_urls = []
+    if isinstance(chunks_info, list):
+        # List of dicts with 'url' keys, or list of URLs
+        for item in chunks_info:
+            if isinstance(item, dict) and "url" in item:
+                chunk_urls.append(item["url"])
+            elif isinstance(item, str):
+                chunk_urls.append(item)
+    elif isinstance(chunks_info, dict):
+        # Try numbered approach
+        n = chunks_info.get("num_files_groupcat", 0)
+        for i in range(n):
+            chunk_urls.append(f"{BASE_URL}{sim}/files/groupcat-{snap}.{i}.hdf5")
+
+    if not chunk_urls:
+        # Fallback: try incrementing until we get a 404
+        print("Could not parse chunk list, trying sequential download...")
+        i = 0
+        while True:
+            url = f"{BASE_URL}{sim}/files/groupcat-{snap}.{i}.hdf5"
+            try:
+                outpath = os.path.join(chunk_dir, f"groupcat_{snap}.{i}.hdf5")
+                download_chunk(url, outpath)
+                chunk_urls.append(url)
+                i += 1
+            except Exception as e:
+                print(f"  Stopped at chunk {i}: {e}")
+                break
+
+        if i == 0:
+            raise RuntimeError("Could not download any chunks")
+        return chunk_dir
+
+    print(f"Found {len(chunk_urls)} chunks to download")
+    for i, url in enumerate(chunk_urls):
+        # Ensure URL has scheme
+        if url.startswith("http://"):
+            url = url.replace("http://", "https://")
+        outpath = os.path.join(chunk_dir, f"groupcat_{snap}.{i}.hdf5")
+        download_chunk(url, outpath)
+
+    return chunk_dir
+
+
+def extract_field(chunk_dir, snap, group="Subhalo", field="SubhaloFlag"):
+    """Concatenate a field from all downloaded groupcat chunks."""
+    pattern = os.path.join(chunk_dir, f"groupcat_{snap}.*.hdf5")
+    files = sorted(glob.glob(pattern),
+                   key=lambda x: int(x.split(".")[-2]))  # sort by chunk number
+
+    if not files:
+        raise FileNotFoundError(f"No groupcat files found: {pattern}")
+
+    print(f"Reading '{group}/{field}' from {len(files)} chunks...")
+    arrays = []
+    for f in files:
+        with h5py.File(f, "r") as hf:
+            if group in hf and field in hf[group]:
+                arrays.append(hf[group][field][:])
+            else:
+                available = list(hf[group].keys()) if group in hf else list(hf.keys())
+                print(f"  Warning: '{group}/{field}' not in {f}")
+                print(f"  Available: {available[:10]}...")
+
+    if not arrays:
+        raise KeyError(f"Field '{group}/{field}' not found in any chunk")
+
+    data = np.concatenate(arrays)
+    print(f"Concatenated {field}: shape={data.shape}, dtype={data.dtype}")
+    return data
+
+
+def save_field(data, field, outpath):
+    """Save extracted field to HDF5."""
+    with h5py.File(outpath, "w") as f:
+        f.create_dataset(field, data=data)
+    print(f"Saved {field} to {outpath} ({os.path.getsize(outpath) / 1e6:.1f} MB)")

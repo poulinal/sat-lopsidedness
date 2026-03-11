@@ -883,7 +883,8 @@ class ListGalaxyGroup:
                 if np.isnan(g_mag) or np.isnan(r_mag):
                     print("WARNING... np.nan")
                     continue  # Skip if magnitudes are not available
-                g_r_color = g_mag - r_mag
+                g_r_color = (g_mag - r_mag)*-1
+                # print(f"redgalaxies: {redGalaxies}, {g_r_color}")
                 if redGalaxies and g_r_color < redBluePoint:
                     continue
                 if blueGalaxies and g_r_color >= redBluePoint:

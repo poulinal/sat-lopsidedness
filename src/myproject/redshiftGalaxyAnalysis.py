@@ -47,7 +47,7 @@ class GalaxyAnalysis:
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
-        self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
+        # self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
         self.plot_M200_distribution_for_all_mass_bins(self.scratchPlotDirc)
 
     def computeRedShiftPlots(self):
@@ -174,6 +174,8 @@ class GalaxyAnalysis:
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_RAW_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.vstack(list_of_galaxy_group.MRL_values)}")
         np.savetxt(output_data_file_MRL, np.vstack(list_of_galaxy_group.MRL_values), header='MRL Directionality')
+
+        return prob_MRL_plotter, MRL_bin_centers, MRL_directionality, MRL_errorbars
     
     def redVsBlueDistributionPlot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None, list_photometrics : list[tuple[float, float, float, float, float, float, float, float]] = None):
         #plot the g-r color distribution for red and blue galaxies in the same plot
@@ -195,7 +197,7 @@ class GalaxyAnalysis:
                         print("WARNING... np.nan")
                         continue  # Skip if magnitudes are not available
                     g_r_color = g_mag - r_mag
-                    gMr_values_raw.append(abs(g_r_color))
+                    gMr_values_raw.append(g_r_color*-1)
         elif list_photometrics is not None:
             for luminosityGalaxy in list_photometrics:
                 if luminosityGalaxy is not None:
@@ -279,11 +281,12 @@ class GalaxyAnalysis:
         color_plotter.save_figure(color_fig,
             self.scratchPlotDirc + f'/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}' if plot_dirc is None else plot_dirc + f'/color_distribution_{self.plotIdentifier}{self.plotEndingFormat}'
         )
-        return intersection_point, intersection_point_valid
+        return intersection_point, intersection_point_valid, color_plotter, color_fig, color_ax
     
     def redVsBluePairwisePlot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
-        intersectionPoint, intersectionPointValid = self.redVsBlueDistributionPlot(list_of_galaxy_groups=list_of_galaxy_groups, plot_dirc=plot_dirc)
+        intersectionPoint, intersectionPointValid, _, _, _ = self.redVsBlueDistributionPlot(list_of_galaxy_groups=list_of_galaxy_groups, plot_dirc=plot_dirc)
         
+        intersectionPoint, intersectionPointValid=0.65, True
         filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True, redBluePoint=intersectionPoint)
         print(f'Number of galaxy groups with only red satellites: {filtered_red_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
@@ -347,6 +350,8 @@ class GalaxyAnalysis:
             print(f"Warning: Raw arrays have different lengths, padding to {max_raw_len} with NaN for saving raw pairwise polar color difference.")
         np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
         
+        return prob_polar_red_blue_plotter, polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, polar_bin_centers_blue, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars
+
     def member150v50Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_GT150_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(minNumGalaxies=150)
         print(f'Number of galaxy groups with more than 150 satellites: {filtered_GT150_list_of_galaxy_groups.getNumGalaxyGroups()}')
@@ -403,6 +408,8 @@ class GalaxyAnalysis:
         raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
         np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
 
+        return prob_polar_GT150_LT50_plotter, polar_bin_centers_GT150, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars, polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_LT50_errorbars
+
     def memberL35vG65Plot(self, list_of_galaxy_groups : ListGalaxyGroup = None, plot_dirc : str = None):
         filtered_LT35R200_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0,0.35])
         print(f'Number of galaxy groups with satellites within 35% R200: {filtered_LT35R200_list_of_galaxy_groups.getNumGalaxyGroups()}')
@@ -458,6 +465,8 @@ class GalaxyAnalysis:
         raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
         np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
     
+        return prob_polar_LT35R200_GT65R200_plotter, polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, polar_bin_centers_GT65R200, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars
+
     def getCentral_FoF_distanceOffset(self, list_of_galaxy_groups : ListGalaxyGroup):
         distanceOffsets = []
         central_positions = []
@@ -586,40 +595,6 @@ class GalaxyAnalysis:
 
         print(f"total number of galaxy groups: {self.filtered_gt13_ls13p5_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt13p5_ls14_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt14_ls14p5_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt14p5_ls15_list_of_galaxy_groups.getNumGalaxyGroups() + self.filtered_gt15_list_of_galaxy_groups.getNumGalaxyGroups()}")
 
-        # #print the num of galaxies in each group where the central is not the most massive
-        # num_mostMassiveNotCentral = 0
-        # for gg in self.filtered_gt13_ls13p5_list_of_galaxy_groups.listGalaxyGroups:
-        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-        #         num_mostMassiveNotCentral +=1
-        #     else:
-        #         print(gg.getMostMassiveSubhalo().getPosition(), gg.getMostCentralSubhalo().getPosition())
-        # print(f"Number of groups with most massive not central in 13-13.5 bin: {num_mostMassiveNotCentral}")
-        # num_mostMassiveNotCentral = 0
-        # for gg in self.filtered_gt13p5_ls14_list_of_galaxy_groups.listGalaxyGroups:
-        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-        #         num_mostMassiveNotCentral +=1
-        # print(f"Number of groups with most massive not central in 13.5-14 bin: {num_mostMassiveNotCentral}")
-        # num_mostMassiveNotCentral = 0
-        # for gg in self.filtered_gt14_ls14p5_list_of_galaxy_groups.listGalaxyGroups:
-        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-        #         num_mostMassiveNotCentral +=1
-        # print(f"Number of groups with most massive not central in 14-14.5 bin: {num_mostMassiveNotCentral}")
-        # num_mostMassiveNotCentral = 0
-        # for gg in self.filtered_gt14p5_ls15_list_of_galaxy_groups.listGalaxyGroups:
-        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-        #         num_mostMassiveNotCentral +=1
-        # print(f"Number of groups with most massive not central in 14.5-15 bin: {num_mostMassiveNotCentral}")
-        # num_mostMassiveNotCentral = 0
-        # for gg in self.filtered_gt15_list_of_galaxy_groups.listGalaxyGroups:
-        #     if gg.getMostMassiveSubhalo().getIdx() != gg.getMostCentralSubhalo().getIdx():
-        #         # print(f"GG ID: {gg.getGroupID()}, Num of galaxies: {gg.getNumSubhalos()}")
-        #         num_mostMassiveNotCentral +=1
-        # print(f"Number of groups with most massive not central in >15 bin: {num_mostMassiveNotCentral}")
-    
         #plot the mass ratio distribution (most central / most massive) for these mass bins
         prob_mass_ratio_plotter = AstroPlotter()
         prob_mass_ratio_fig, prob_mass_ratio_ax = prob_mass_ratio_plotter.create_figure()
@@ -788,27 +763,20 @@ class GalaxyAnalysis:
                                        (self.filtered_gt15_list_of_galaxy_groups, '$M_{{200}}$>1e15 Msun')], plot_dirc=plot_dirc) 
         
         # run for each mass bin
-        self.plot_pairwise_polar_by_mass_bins_and_centralMassive_status([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '1e13<$M_{{200}}$<1e13.5 Msun'),
+        prob_polar_mass_plotter_by_mass, prob_polar_mass_fig_by_mass, prob_polar_mass_ax_by_mass = self.plot_pairwise_polar_by_mass_bins_and_centralMassive_status([(self.filtered_gt13_ls13p5_list_of_galaxy_groups, '1e13<$M_{{200}}$<1e13.5 Msun'),
                                                                     (self.filtered_gt13p5_ls14_list_of_galaxy_groups, '1e13.5<$M_{{200}}$<1e14 Msun'),
                                                                     (self.filtered_gt14_ls14p5_list_of_galaxy_groups, '1e14<$M_{{200}}$<1e14.5 Msun'),
                                                                     (self.filtered_gt14p5_ls15_list_of_galaxy_groups, '1e14.5<$M_{{200}}$<1e15 Msun'),
                                                                     (self.filtered_gt15_list_of_galaxy_groups, '$M_{{200}}$>1e15 Msun')], plot_dirc=plot_dirc)
-        # plot_pairwise_polar_by_mass_bins_and_centralMassive_status([
-        #                                                             (filtered_gt15_list_of_galaxy_groups, '$M_{{200}}$>1e15 Msun')])
-        
-        #plot for all galaxy groups with central most massive vs not central most massive without splitting into mass bins
-        prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax = self.plot_pairwise_polar_by_mass_bins_and_centralMassive_status([(self.loaded_list_of_galaxy_groups, '$M_{{200}}$>1e13 Msun')])
-        
-        #replot this with different ylims
-        prob_polar_mass_ax.set_ylim(0.0050, 0.0065)
-        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim{self.plotEndingFormat}') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_differentYlim{self.plotEndingFormat}')
+       
+        prob_polar_mass_plotter_by_mass.save_figure(prob_polar_mass_fig_by_mass, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_{self.plotEndingFormat}') if plot_dirc is None else prob_polar_mass_plotter_by_mass.save_figure(prob_polar_mass_fig_by_mass, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_{self.plotEndingFormat}')
 
         #overlay
         # polar_bin_centers, pairwise_polar_differences, pairwise_polar_errorbars
-        pairwiseplot, polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars = self.pairwisePolarDifferencePlot(self.loaded_list_of_galaxy_groups)
-        prob_polar_mass_ax.errorbar(polar_bin_centers, pairwise_polar_differences_binned, yerr=pairwise_polar_errorbars, fmt='o', label='All Galaxy Groups', color='black', markersize=3, alpha=0.5)
-        prob_polar_mass_ax.legend()
-        prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay{self.plotEndingFormat}') if plot_dirc is None else prob_polar_mass_plotter.save_figure(prob_polar_mass_fig, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay{self.plotEndingFormat}')
+        # pairwiseplot, polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars = self.pairwisePolarDifferencePlot(self.loaded_list_of_galaxy_groups)
+        # prob_polar_mass_ax_by_mass.errorbar(polar_bin_centers, pairwise_polar_differences_binned, yerr=pairwise_polar_errorbars, fmt='o', label='All Galaxy Groups', color='black', markersize=3, alpha=0.5)
+        # prob_polar_mass_ax_by_mass.legend()
+        # prob_polar_mass_plotter_by_mass.save_figure(prob_polar_mass_fig_by_mass, self.scratchPlotDirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay{self.plotEndingFormat}') if plot_dirc is None else prob_polar_mass_plotter_by_mass.save_figure(prob_polar_mass_fig_by_mass, plot_dirc + f'/pairwise_polar_difference_allMasses_{self.plotIdentifier}_overlay{self.plotEndingFormat}')
         
     # plot the median number of subhalos within r200 for these mass bins
     def plot_median_num_subhalos_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None):
@@ -921,7 +889,7 @@ class GalaxyAnalysis:
             
         return prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax
         
-    def calculate_fraction_less_than_percentile(self, MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> float:
+    def calculate_fraction_less_than_percentile(self, MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> tuple[float, float, float]:
         #for each galaxy group and for each projection, calculate the fraction of MRL values that are less than the given percentile of the random MRL values
         # MRL_values is a list of MRL values for each galaxy group and each projection (length is 3*number of galaxy groups since 3 projections per group)
         # random_MRL_values is a list of lists, where len(random_MRL_values) is number of galaxy groups, len(random_MRL_values[i]) is sample num (1000) * 3 projections, e.g. 3000 since 1000 for each of the 3 projections and is arranged as [rx1, ry1, rz1, rx2, ry2, rz2,...])
@@ -934,7 +902,7 @@ class GalaxyAnalysis:
             count_less_than_percentile += np.sum(np.array(group_MRL_values) < percentile_value) # count how many of the 3 MRL values are less than the percentile value and add to the total count
             total_count += len(group_MRL_values) # add 3 to the total count since there are 3 MRL values for each galaxy group
         fraction = count_less_than_percentile / total_count if total_count > 0 else 0
-        return fraction
+        return fraction, count_less_than_percentile, total_count
 
     def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None, filename:str='', percentageMRL:float = 0.99*100):
         overlayMRLPlotter = AstroPlotter()
@@ -1017,8 +985,8 @@ class GalaxyAnalysis:
             # print(f"len listGG: {len(listGG)}, len MRL_values: {len(MRL_values)}, len random_MRL_values: {len(random_MRL_values)}")
             #include a text box in the plot with the fraction of MRL values that are less than the 99th percentile of random MRL values
             # fraction_less_than_nth_percentile = np.sum(np.array(MRL_values) < percentile_MRL) / len(MRL_values)
-            fraction_less_than_nth_percentile = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
-            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f}", loc='bottom center')
+            fraction_less_than_nth_percentile, count_less_than_percentile, total_count = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
+            overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}", loc='bottom center')
             
             # save into .txt file:
             # In table: galaxy id, num of members, mass of cluster, MRL value of that projection, fraction less than the MRL I measured
@@ -1313,39 +1281,6 @@ class GalaxyAnalysis:
             f.write("PolarBinCenter\tPolarProbability\tPolarErrorBar\n")
             for m, (polar_bin_center, polar_prob, polar_errorbar) in enumerate(zip(high_MRL_pairwise_polar_bin_centers, high_MRL_pairwise_polar_bins, high_MRL_pairwise_polar_errorbars)):
                 f.write(f"{polar_bin_center}\t{polar_prob}\t{polar_errorbar}\n")
-
-    # for each mass bin, get the probability a galaxy group has some number of satellites
-    def plot_satellite_number_distribution_by_mass_bins(self, listGG : list[tuple[ListGalaxyGroup, str]]):
-        satellite_number_plotter = AstroPlotter()
-        satellite_number_fig, satellite_number_ax = satellite_number_plotter.create_figure()
-        
-        for listGalaxyGroup, label in listGG:
-            satellite_numbers = [len(gg.getSatelliteSubhalos()) for gg in listGalaxyGroup.getAllGalaxyGroups()]
-            satellite_number_bins, satellite_number_bin_edges, satellite_number_errorbars = ListGalaxyGroup.get_histogram_bins(satellite_numbers, bins='auto', errorbarType='poisson')
-            
-            satellite_number_plotter.scatter_plot(
-                satellite_number_bin_edges, 
-                satellite_number_bins,
-                errorBars = satellite_number_errorbars,
-                ax=satellite_number_ax, # Use the same axis for overlay
-                xlabel='Number of Satellites',
-                ylabel='Probability Density',
-                title=f'Number of Satellites Distribution for {self.sim} Galaxy Groups in {label}',
-                # ylim = (0, 0.01),
-                label=f"{label}",
-                output_filename=None,
-                grid=True,
-            )
-        satellite_number_ax.legend()
-        #set ylim min to 0
-        satellite_number_ax.set_ylim(bottom=0)
-        satellite_number_plotter.save_figure(satellite_number_fig, self.scratchPlotDirc + f'/satellite_number_distribution_by_mass_bins_{self.sim}{self.plotEndingFormat}')
-        
-    def plot_satellite_number_distribution_for_all_mass_bins(self, plot_dirc : str = None):
-        list_of_mass_list_galaxy_groups = [self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups]
-        mass_bin_labels = ['$13<M_{200}<13.5$', '$13.5<M_{200}<14$', '$14<M_{200}<14.5$', '$14.5<M_{200}<15$', '$M_{200}>15$']
-        list_of_mass_bin_galaxy_groups = list(zip(list_of_mass_list_galaxy_groups, mass_bin_labels))
-        self.plot_satellite_number_distribution_by_mass_bins(list_of_mass_bin_galaxy_groups)
 
     def get_satellite_join_time(self, listGG:list[tuple[ListGalaxyGroup, str]], rewrite:Optional[bool] = None):
         #Box boundary 

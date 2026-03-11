@@ -247,7 +247,7 @@ class AstroPlotter:
             ax.plot(x_smooth, spline(x_smooth),'k--', alpha=0.5, linewidth=3, c=scatter_color, label=label)
         
         if errorBars is not None:
-            ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=sc.get_facecolor()[0], alpha=0.5, capsize=2)
+            ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=sc.get_facecolor()[0], alpha=0.5, capsize=2, **kwargs)
             
         # Set scales
         if xlog:
