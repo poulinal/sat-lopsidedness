@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from urllib.parse import urlparse, urljoin
+import glob
 
 # Load environment variables from .env file
 load_dotenv()
@@ -236,8 +237,6 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
             print("tring to access api field")
             dataFile=get(url,fName=fileName)
 
-            with h5py.File(dataFile,'r') as f:
-                data=np.array(f['Subhalo'][field])
         except:
             print("instead accessing groupcat")
             try:
@@ -253,13 +252,17 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
                 if saveFile:
                     savepath = fileName
                     save_field(data, field, savepath)
+                return data
+   
+    with h5py.File(dataFile,'r') as f:
+                data=np.array(f['Subhalo'][field])
         
 
     return data
     
   
 def getHaloField(field, simulation='TNG100-1', snapshot=99,
-                 fileName='tempCat', rewriteFile=0):
+                 fileName='tempCat', rewriteFile=0, saveFile:bool=False):
     """
     Credit to TNG team
     Data from one field for all halos/subhalos in a given snapshot      
@@ -334,9 +337,28 @@ def getHaloField(field, simulation='TNG100-1', snapshot=99,
     dataFile=fileName+'.hdf5'
     
     if not os.path.exists(dataFile) or rewriteFile==1:
-        print('i did it')
         url='http://www.tng-project.org/api/'+simulation+'/files/groupcat-'+str(snapshot)+'/?Group='+field
-        dataFile=get(url,fName=fileName)
+        # dataFile=get(url,fName=fileName)
+        try:
+            print("tring to access api field")
+            dataFile=get(url,fName=fileName)
+
+        except:
+            print("instead accessing groupcat")
+            try:
+                data = extract_field(chunk_dir, snapshot, group='Group', field=field)
+            except:
+                print("need to download all chunks first")
+                datacatalogFolder = os.path.dirname(os.path.dirname(dataFile))
+                chunk_dir = download_all_chunks(simulation, snapshot, datacatalogFolder)
+                print(f"\nAll chunks saved to: {chunk_dir}")
+                data = extract_field(chunk_dir, snapshot, group='Group', field=field)
+                print(f"retrieved field")
+
+                if saveFile:
+                    savepath = fileName
+                    save_field(data, field, savepath)
+                return data
 
         
     with h5py.File(dataFile,'r') as f:
@@ -409,10 +431,16 @@ def download_chunk(chunk_url, outpath):
     return outpath
 
 
-def download_all_chunks(sim, snap, outdir):
+def download_all_chunks(sim, snap, outdir, rewrite=False):
     """Download all groupcat chunks for a simulation/snapshot."""
     chunk_dir = os.path.join(outdir, f"{sim}_groupcat_{snap}")
-    os.makedirs(chunk_dir, exist_ok=True)
+    if rewrite and os.path.exists(chunk_dir):
+        print(f"Removing existing directory: {chunk_dir}")
+        import shutil
+        shutil.rmtree(chunk_dir)
+    else:
+        print(f"Using existing directory: {chunk_dir}")
+    # os.makedirs(chunk_dir, exist_ok=True)
 
     chunks_info = list_groupcat_chunks(sim, snap)
 
@@ -429,14 +457,14 @@ def download_all_chunks(sim, snap, outdir):
         # Try numbered approach
         n = chunks_info.get("num_files_groupcat", 0)
         for i in range(n):
-            chunk_urls.append(f"{BASE_URL}{sim}/files/groupcat-{snap}.{i}.hdf5")
+            chunk_urls.append(f"{baseUrl}{sim}/files/groupcat-{snap}.{i}.hdf5")
 
     if not chunk_urls:
         # Fallback: try incrementing until we get a 404
         print("Could not parse chunk list, trying sequential download...")
         i = 0
         while True:
-            url = f"{BASE_URL}{sim}/files/groupcat-{snap}.{i}.hdf5"
+            url = f"{baseUrl}{sim}/files/groupcat-{snap}.{i}.hdf5"
             try:
                 outpath = os.path.join(chunk_dir, f"groupcat_{snap}.{i}.hdf5")
                 download_chunk(url, outpath)
@@ -452,6 +480,9 @@ def download_all_chunks(sim, snap, outdir):
 
     print(f"Found {len(chunk_urls)} chunks to download")
     for i, url in enumerate(chunk_urls):
+        if not rewrite and os.path.exists(os.path.join(chunk_dir, f"groupcat_{snap}.{i}.hdf5")):
+            print(f"  Already exists: {chunk_dir}/groupcat_{snap}.{i}.hdf5, skipping")
+            continue
         # Ensure URL has scheme
         if url.startswith("http://"):
             url = url.replace("http://", "https://")
@@ -463,6 +494,7 @@ def download_all_chunks(sim, snap, outdir):
 
 def extract_field(chunk_dir, snap, group="Subhalo", field="SubhaloFlag"):
     """Concatenate a field from all downloaded groupcat chunks."""
+    
     pattern = os.path.join(chunk_dir, f"groupcat_{snap}.*.hdf5")
     files = sorted(glob.glob(pattern),
                    key=lambda x: int(x.split(".")[-2]))  # sort by chunk number

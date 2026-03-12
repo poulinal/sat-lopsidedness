@@ -41,7 +41,7 @@ class GalaxyGroupData:
         #convert boxsize to kpc from Mpc/h
         self.TNG300_1_boxsize_kpc = self.TNG300_1_boxsize * 1e3 /self.h #kpc
         self.TNG_Cluster_boxsize_kpc = self.TNG_Cluster_boxsize * 1e3 / self.h
-        self.sim_boxsize_kpc = self.TNG_Cluster_boxsize if self.sim == 'TNG-Cluster' else self.TNG300_1_boxsize
+        self.sim_boxsize_kpc = self.TNG_Cluster_boxsize_kpc if self.sim == 'TNG-Cluster' else self.TNG300_1_boxsize_kpc
 
 
         self.z = self.snapshot_dic[self.snapshot][0] #redshift
@@ -74,6 +74,9 @@ class GalaxyGroupData:
     def computeAllData(self, additionalFileIdentifier:str=''):
         for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
+                if snapshot == 99:
+                    print(f"previously got all data for {snapshot}")
+                    continue
                 if snapshot < 50:
                     print(f"Skipping redshifts less than snapshot 50 aka redshift 1.5 due to smoothing length change, {snapshot}")
                     continue
