@@ -357,7 +357,7 @@ class ListGalaxyGroup:
             random_MRL_values.append(random_MRL_value)
         return random_MRL_values
 
-    def getFilterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, M_default_r_min : float=None, M_default_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, redBluePoint: float=0.65, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
+    def getFilterSubhalos(self, minGGMass : float=None, maxGGMass : float=None, minSatStellarMass : float=None, maxSatStellarMass : float=None, minHalfMassRad_kpc : float=None, maxHalfMassRad_kpc : float=None, centralPosTolerance_kpc : Optional[float]=None, M_r_min : float=None, M_r_max : float=None, M_default_r_min : float=None, M_default_r_max : float=None, satWithinR200 : bool = False, redGalaxies : bool = False, blueGalaxies : bool = False, redDefaultGalaxies : bool = False, blueDefaultGalaxies : bool = False, redBluePoint: float=0.65, minNumGalaxies : Optional[int]=None, maxNumGalaxies : Optional[int]=None, withinXPercentR200 : tuple[float, float] = None, centralIsMostMassive : Optional[bool]=None, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
         '''
         Modifies list_galaxy_groups and Filters subhalos in each galaxy group based on specified criteria.
         - remove non cosmlogoical in origin (subhaloflag = 0)
@@ -388,7 +388,7 @@ class ListGalaxyGroup:
             
         # Prepare arguments for parallel processing
         args_list = [
-            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, M_default_r_min, M_default_r_max, satWithinR200, redGalaxies, blueGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive)
+            (gg, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, M_default_r_min, M_default_r_max, satWithinR200, redGalaxies, blueGalaxies, redDefaultGalaxies, blueDefaultGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive)
             for gg in self.listGalaxyGroups
         ]
         total = len(args_list)
@@ -822,20 +822,20 @@ class ListGalaxyGroup:
         return [R_xy, R_yz, R_xz]
 
     @staticmethod
-    def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float,float, float, float, bool, bool, bool, float, int, int, tuple[float, float]]):
+    def _filter_subhalos_for_group(args : tuple[GalaxyGroup, float, float, float, float, float, float, float, float, float,float, float, float, bool, bool, bool, bool, bool, float, int, int, tuple[float, float]]):
         """Helper function to filter subhalos for a single galaxy group."""
         from myproject.utilities.Subhalo import Subhalo
         from myproject.utilities.GalaxyGroup import GalaxyGroup
         import numpy as np
         
-        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, M_default_r_min, M_default_r_max, satWithinR200, redGalaxies, blueGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive = args
-        
-        # print(f"masses: {minGGMass, galaxyGroup.getMCrit200()}")
+        galaxyGroup, minGGMass, maxGGMass, minSatStellarMass, maxSatStellarMass, minHalfMassRad_kpc, maxHalfMassRad_kpc, centralPosTolerance_kpc, M_r_min, M_r_max, M_default_r_min, M_default_r_max, satWithinR200, redGalaxies, blueGalaxies, redDefaultGalaxies, blueDefaultGalaxies, redBluePoint, minNumGalaxies, maxNumGalaxies, withinXPercentR200, centralIsMostMassive = args
+
+        # Quick group-level checks (unchanged)
         if minGGMass is not None and galaxyGroup.getMCrit200() <= minGGMass:
             return None
         if maxGGMass is not None and galaxyGroup.getMCrit200() >= maxGGMass:
             return None
-        
+
         if centralIsMostMassive is not None:
             central = galaxyGroup.getCentralSubhalo()
             most_massive = galaxyGroup.getMostMassiveSubhalo()
@@ -843,78 +843,123 @@ class ListGalaxyGroup:
                 return None
             if not centralIsMostMassive and central == most_massive:
                 return None
-        
+
         central_pos = galaxyGroup.getCentralSubhalo().getPosition()
         galaxyGroupCM = galaxyGroup.getPosCM()
-        
+
         distance = np.linalg.norm(central_pos - galaxyGroupCM)
         if centralPosTolerance_kpc is not None and distance > centralPosTolerance_kpc:
-            return None  # Signal to skip this group
-        
-        filtered_subhalos = []
-        for subhalo in galaxyGroup.getSubhalos():
-            if subhalo.getFlag() != 1:
-                continue
-            if minSatStellarMass is not None and subhalo.getStellarMass() < minSatStellarMass:
-                continue
-            if maxSatStellarMass is not None and subhalo.getStellarMass() > maxSatStellarMass:
-                continue
-            if minHalfMassRad_kpc is not None and subhalo.getHalfMassRad() < minHalfMassRad_kpc:
-                continue
-            if maxHalfMassRad_kpc is not None and subhalo.getHalfMassRad() > maxHalfMassRad_kpc:
-                continue
-            if M_r_min is not None and (np.isnan(subhalo.getRbandMagnitude()) or subhalo.getRbandMagnitude() <= M_r_min):
-                continue
-            if M_r_max is not None and (np.isnan(subhalo.getRbandMagnitude()) or subhalo.getRbandMagnitude() >= M_r_max):
-                continue
-            if M_default_r_min is not None and (np.isnan(subhalo.getDefaultRbandMagnitude()) or subhalo.getDefaultRbandMagnitude() <= M_default_r_min):
-                continue
-            if M_default_r_max is not None and (np.isnan(subhalo.getDefaultRbandMagnitude()) or subhalo.getDefaultRbandMagnitude() >= M_default_r_max):
-                continue
-            if satWithinR200 and subhalo != galaxyGroup.getCentralSubhalo():
-                distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
-                # print(f"distance: {distance_to_central} to {galaxyGroup.getRCrit200()}")
-                if distance_to_central > galaxyGroup.getRCrit200():
-                    continue
-                
-            if (redGalaxies or blueGalaxies) and subhalo != galaxyGroup.getCentralSubhalo():
-                g_mag = subhalo.getGbandMagnitude()
-                r_mag = subhalo.getRbandMagnitude()
-                if np.isnan(g_mag) or np.isnan(r_mag):
-                    print("WARNING... np.nan")
-                    continue  # Skip if magnitudes are not available
-                g_r_color = (g_mag - r_mag)*-1
-                # print(f"redgalaxies: {redGalaxies}, {g_r_color}")
-                if redGalaxies and g_r_color < redBluePoint:
-                    continue
-                if blueGalaxies and g_r_color >= redBluePoint:
-                    continue
-                
-            if withinXPercentR200 is not None and subhalo != galaxyGroup.getCentralSubhalo():
-                distance_to_central = np.linalg.norm(subhalo.getPosition() - central_pos)
-                r200 = galaxyGroup.getRCrit200()
+            return None  # Skip this group
+
+        # Vectorize per-subhalo checks using NumPy arrays to avoid Python loops
+        subhalos = list(galaxyGroup.getSubhalos())
+        if len(subhalos) == 0:
+            return None
+
+        # Extract arrays of attributes
+        flags = np.array([sh.getFlag() for sh in subhalos])
+        stellar = np.array([sh.getStellarMass() for sh in subhalos])
+        halfrad = np.array([sh.getHalfMassRad() for sh in subhalos])
+        positions = np.array([sh.getPosition() for sh in subhalos])
+        try:
+            r_mag = np.array([sh.getRbandMagnitude() for sh in subhalos], dtype=float)
+        except Exception:
+            r_mag = np.array([np.nan for _ in subhalos], dtype=float)
+        try:
+            def_r_mag = np.array([sh.getDefaultRbandMagnitude() for sh in subhalos], dtype=float)
+            # print(f"len def_r_mag: {len(def_r_mag)}")
+        except Exception:
+            def_r_mag = np.array([np.nan for _ in subhalos], dtype=float)
+        try:
+            g_mag = np.array([sh.getGbandMagnitude() for sh in subhalos], dtype=float)
+        except Exception:
+            g_mag = np.array([np.nan for _ in subhalos], dtype=float)
+        try:
+            def_g_mag = np.array([sh.getDefaultGbandMagnitude() for sh in subhalos], dtype=float)
+            # print(f"len def_g_mag: {len(def_g_mag)}")
+        except Exception:
+            def_g_mag = np.array([np.nan for _ in subhalos], dtype=float)
+
+        is_central = np.array([sh is galaxyGroup.getCentralSubhalo() for sh in subhalos])
+
+        # Start with flag mask
+        mask = (flags == 1)
+
+        # Stellar mass filters (apply to all subhalos, including central)
+        if minSatStellarMass is not None:
+            mask &= (stellar >= minSatStellarMass)
+        if maxSatStellarMass is not None:
+            mask &= (stellar <= maxSatStellarMass)
+
+        # Half-mass radius filters
+        if minHalfMassRad_kpc is not None:
+            mask &= (halfrad >= minHalfMassRad_kpc)
+        if maxHalfMassRad_kpc is not None:
+            mask &= (halfrad <= maxHalfMassRad_kpc)
+
+        # r-band magnitude filters: original logic skipped subhalo if NaN OR out-of-range.
+        if M_r_min is not None:
+            valid = ~np.isnan(r_mag)
+            mask &= (valid & (r_mag > M_r_min))
+        if M_r_max is not None:
+            valid = ~np.isnan(r_mag)
+            mask &= (valid & (r_mag < M_r_max))
+
+        # default r-band magnitude
+        if M_default_r_min is not None:
+            valid = ~np.isnan(def_r_mag)
+            mask &= (valid & (def_r_mag > M_default_r_min))
+        if M_default_r_max is not None:
+            valid = ~np.isnan(def_r_mag)
+            mask &= (valid & (def_r_mag < M_default_r_max))
+
+        # Distance-based checks (apply only to non-central entries)
+        if satWithinR200 or withinXPercentR200 is not None:
+            distances = np.linalg.norm(positions - central_pos, axis=1)
+            r200 = galaxyGroup.getRCrit200()
+            if satWithinR200:
+                # central is always allowed; non-central must be within r200
+                mask &= (is_central | (distances <= r200))
+            if withinXPercentR200 is not None:
                 min_radius = withinXPercentR200[0] * r200
                 max_radius = withinXPercentR200[1] * r200
-                if distance_to_central < min_radius or distance_to_central > max_radius:
-                    continue
-            # If we made it past all filters, add the subhalo
-            filtered_subhalos.append(subhalo)
-        
-        if len(filtered_subhalos) <= 1: #since central
+                mask &= (is_central | ((distances >= min_radius) & (distances <= max_radius)))
+
+        # Color selection (red/blue) - only applies to non-central
+        if redGalaxies or blueGalaxies:
+            color_valid = ~np.isnan(g_mag) & ~np.isnan(r_mag)
+            g_r_color = (g_mag - r_mag) * -1
+            if redGalaxies:
+                mask &= (is_central | (color_valid & (g_r_color >= redBluePoint)))
+            if blueGalaxies:
+                mask &= (is_central | (color_valid & (g_r_color < redBluePoint)))
+
+        if redDefaultGalaxies or blueDefaultGalaxies:
+            color_valid = ~np.isnan(def_g_mag) & ~np.isnan(def_r_mag)
+            g_r_color = (def_g_mag - def_r_mag) #* -1
+            if redDefaultGalaxies:
+                mask &= (is_central | (color_valid & (g_r_color >= redBluePoint)))
+            if blueDefaultGalaxies:
+                mask &= (is_central | (color_valid & (g_r_color < redBluePoint)))
+
+        # Build filtered subhalo list preserving original object references
+        filtered_subhalos = [sh for sh, m in zip(subhalos, mask) if m]
+
+        if len(filtered_subhalos) <= 1:  # need at least central + one satellite
             return None
-        
+
         if minNumGalaxies is not None and len(filtered_subhalos) < minNumGalaxies:
             return None
         if maxNumGalaxies is not None and len(filtered_subhalos) > maxNumGalaxies:
             return None
-        
+
         filtered_galaxyGroup = GalaxyGroup(
-            galaxyGroup.getGroupID(), 
+            galaxyGroup.getGroupID(),
             galaxyGroup.getRCrit200(),
-            galaxyGroup.getMCrit200(), 
-            galaxyGroup.getPosCM(), 
-            galaxyGroup.getPos(), 
-            filtered_subhalos
+            galaxyGroup.getMCrit200(),
+            galaxyGroup.getPosCM(),
+            galaxyGroup.getPos(),
+            filtered_subhalos,
         )
         return filtered_galaxyGroup
 

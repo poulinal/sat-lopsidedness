@@ -242,8 +242,11 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
             try:
                 data = extract_field(chunk_dir, snapshot, group='Subhalo', field=field)
             except:
-                print("need to download all chunks first")
                 datacatalogFolder = os.path.dirname(os.path.dirname(dataFile))
+                print(f"need to download all chunks first to {datacatalogFolder}")
+                if not os.path.exists(datacatalogFolder):
+                    os.makedirs(datacatalogFolder)
+                    print(f'created directory: {datacatalogFolder}')
                 chunk_dir = download_all_chunks(simulation, snapshot, datacatalogFolder)
                 print(f"\nAll chunks saved to: {chunk_dir}")
                 data = extract_field(chunk_dir, snapshot, group='Subhalo', field=field)
@@ -438,9 +441,10 @@ def download_all_chunks(sim, snap, outdir, rewrite=False):
         print(f"Removing existing directory: {chunk_dir}")
         import shutil
         shutil.rmtree(chunk_dir)
-    else:
+    elif os.path.exists(chunk_dir):
         print(f"Using existing directory: {chunk_dir}")
-    # os.makedirs(chunk_dir, exist_ok=True)
+    else:
+        os.makedirs(chunk_dir, exist_ok=False)
 
     chunks_info = list_groupcat_chunks(sim, snap)
 

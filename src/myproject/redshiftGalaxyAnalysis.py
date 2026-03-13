@@ -36,14 +36,14 @@ class GalaxyAnalysis:
 
         
     def computeAllPlots(self):
-        self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        # self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        # self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         self.redVsBluePairwisePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
-        self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
-        self.MRLDistributionPlots(self.scratchPlotDirc)
+        # self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        # self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        # # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
+        # self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
+        # self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
@@ -190,8 +190,8 @@ class GalaxyAnalysis:
         if list_of_galaxy_groups is not None:
             for galaxy_group in list_of_galaxy_groups.getAllGalaxyGroups():
                 for subhalo in galaxy_group.getSubhalos():
-                    g_mag = subhalo.getGbandMagnitude()
-                    r_mag = subhalo.getRbandMagnitude()
+                    g_mag = subhalo.getGbandMagnitude() if self.sim == 'TNG300-1' else subhalo.getDefaultGbandMagnitude()
+                    r_mag = subhalo.getRbandMagnitude() if self.sim == 'TNG300-1' else subhalo.getDefaultRbandMagnitude()
                     # print(f"g_mag, :{g_mag}, rmag: {r_mag}")
                     if np.isnan(g_mag) or np.isnan(r_mag):
                         print("WARNING... np.nan")
@@ -287,10 +287,10 @@ class GalaxyAnalysis:
         intersectionPoint, intersectionPointValid, _, _, _ = self.redVsBlueDistributionPlot(list_of_galaxy_groups=list_of_galaxy_groups, plot_dirc=plot_dirc)
         
         intersectionPoint, intersectionPointValid=0.65, True
-        filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True, redBluePoint=intersectionPoint)
+        filtered_red_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(redGalaxies=True, redBluePoint=intersectionPoint) if self.sim=='TNG300-1' else list_of_galaxy_groups.getFilterSubhalos(redDefaultGalaxies=True, redBluePoint=intersectionPoint)
         print(f'Number of galaxy groups with only red satellites: {filtered_red_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
-        filtered_blue_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(blueGalaxies=True, redBluePoint=intersectionPoint)
+        filtered_blue_list_of_galaxy_groups = list_of_galaxy_groups.getFilterSubhalos(blueGalaxies=True, redBluePoint=intersectionPoint) if self.sim=='TNG300-1' else list_of_galaxy_groups.getFilterSubhalos(blueDefaultGalaxies=True, redBluePoint=intersectionPoint)
         print(f'Number of galaxy groups with only blue satellites: {filtered_blue_list_of_galaxy_groups.getRangeOfNumSubhalos()}')
 
         list_pairwise_polar_differences_red = filtered_red_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_red_{self.plotIdentifier}', rewrite=self.generalRewrite)

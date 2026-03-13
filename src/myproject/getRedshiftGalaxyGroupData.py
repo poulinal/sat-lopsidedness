@@ -77,6 +77,9 @@ class GalaxyGroupData:
                 if snapshot == 99:
                     print(f"previously got all data for {snapshot}")
                     continue
+                if snapshot > 84:
+                    print(f"previously got all data for {snapshot}")
+                    continue
                 if snapshot < 50:
                     print(f"Skipping redshifts less than snapshot 50 aka redshift 1.5 due to smoothing length change, {snapshot}")
                     continue
@@ -107,6 +110,10 @@ class GalaxyGroupData:
         print(f"num subhalos: {self.subhaloGroupNum.shape[0]}")
         print(f"rough number of galaxygroups: {len(np.unique(self.subhaloGroupNum))}")
         for i in range(self.subhaloGroupNum.shape[0]):
+            if self.flag[i] == False: #remove
+                continue
+            if np.isnan(self.SubhaloStellarPhotometrics[i][5]):
+                continue
             group_num = self.subhaloGroupNum[i]
             
             if group_num > self.maxValidGroupIndex: ##NOTE assuming group numbers are sequential and start from 0
@@ -117,6 +124,8 @@ class GalaxyGroupData:
             
             if group_num not in temp_dict_galaxy_groups: #check if galaxy group already exists - if not, create it - else just add the subhalo to it
                 #initialize new empty galaxy group
+                if self.groupMCrit200[group_num] < 1e13:
+                    continue
                 galaxyGroup = None
                 galaxyGroup = GalaxyGroup(group_id=group_num, RCrit200=self.groupRCrit200[group_num], posCM=self.groupCM[group_num],  MCrit200=self.groupMCrit200[group_num], pos=self.groupPos[group_num], listSubhalos=[])
                 # print(galaxyGroup.getNumSubhalos())
@@ -256,6 +265,9 @@ class GalaxyGroupData:
         if not os.path.exists(self.scratchDataDirc + 'catalogs/SubhaloStellarPhotometrics'):
             os.makedirs(self.scratchDataDirc + 'catalogs/SubhaloStellarPhotometrics')
             print(f'created directory: {self.scratchDataDirc} "catalogs/SubhaloStellarPhotometrics"')
+
+        if sim == 'TNG-Cluster':
+            return np.zeros(len(self.SubhaloStellarPhotometrics))
 
         rewriteFile=0
         fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloSDSSStellarPhotometrics'
