@@ -36,14 +36,14 @@ class GalaxyAnalysis:
 
         
     def computeAllPlots(self):
-        # self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.pairwisePolarDifferencePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.meanResultantLengthPlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         self.redVsBluePairwisePlot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
-        # self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.member150v50Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
+        self.memberL35vG65Plot(self.filtered_gt14_list_of_galaxy_groups, self.scratchPlotDirc)
         # # self.centralFoFDistanceOffsets(self.scratchPlotDirc)
-        # self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
-        # self.MRLDistributionPlots(self.scratchPlotDirc)
+        self.probabilityDistributionOf5MassGroups(self.scratchPlotDirc)
+        self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
         self.HighMRLPlots(self.scratchPlotDirc)
@@ -88,12 +88,12 @@ class GalaxyAnalysis:
     def setGeneralRewrite(self, rewrite : bool):
         self.generalRewrite = rewrite
     
-    def setSnapshot(self, newsnapshot:int, newsim:str='TNG300-1'):
+    def setSnapshot(self, newsnapshot:int, newsim:str='TNG300-1', luminosityType='SDSS'):
         self.snapshot = newsnapshot
         self.sim = newsim
         self.plotIdentifier = f'{newsim}_{self.snapshot_dic[newsnapshot][1]}'
         self.setDircs()
-        self.load_galaxy_groups()
+        self.load_galaxy_groups(luminosityType)
         self.initializeMassSubgroups()
 
     def initializeMassSubgroups(self, list_of_galaxy_groups : ListGalaxyGroup = None):
@@ -139,11 +139,11 @@ class GalaxyAnalysis:
         
         # save bin centers and probabilities, errorbars to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar/pairwise_polar_difference_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density    Errorbars')
+        # np.savetxt(output_data_file, np.column_stack((polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars)), header='Pairwise Polar Difference (degrees)    Probability Density    Errorbars')
         
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar/pairwise_polar_difference_RAW_{self.plotIdentifier}.txt'
-        np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences)), header='Pairwise Polar Difference (degrees)')
+        # np.savetxt(output_data_file, np.column_stack((list_pairwise_polar_differences)), header='Pairwise Polar Difference (degrees)')
         
         return prob_polar_plotter, polar_bin_centers, pairwise_polar_differences_binned, pairwise_polar_errorbars
         
@@ -168,12 +168,12 @@ class GalaxyAnalysis:
         #save bin centers and probabilities to text file
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.column_stack((MRL_bin_centers, MRL_directionality))}")
-        np.savetxt(output_data_file_MRL, np.column_stack((MRL_bin_centers, MRL_directionality, MRL_errorbars)), header='MRL Directionality    Probability Density    Errorbars')
+        # np.savetxt(output_data_file_MRL, np.column_stack((MRL_bin_centers, MRL_directionality, MRL_errorbars)), header='MRL Directionality    Probability Density    Errorbars')
         
         #save bin MRL values to text file
         output_data_file_MRL = self.scratchDataDirc + f'/MRL_directionality/MRL_directionality_RAW_{self.plotIdentifier}.txt'
         # print(f"data to be saved: {np.vstack(list_of_galaxy_group.MRL_values)}")
-        np.savetxt(output_data_file_MRL, np.vstack(list_of_galaxy_group.MRL_values), header='MRL Directionality')
+        # np.savetxt(output_data_file_MRL, np.vstack(list_of_galaxy_group.MRL_values), header='MRL Directionality')
 
         return prob_MRL_plotter, MRL_bin_centers, MRL_directionality, MRL_errorbars
     
@@ -340,7 +340,7 @@ class GalaxyAnalysis:
         if any(len(arr) != max_len for arr in arrays):
             print(f"Warning: Arrays have different lengths, padding to {max_len} with NaN for saving pairwise polar color difference.")
         print(f"data to be saved: {np.column_stack(arrays_padded)}")
-        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Error Bar (Red)    Probability Density (Blue)    Error Bar (Blue)')
+        # np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (Red)    Error Bar (Red)    Probability Density (Blue)    Error Bar (Blue)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_color/pairwise_polar_color_difference_RAW_{self.plotIdentifier}.txt'
         raw_arrays = [list_pairwise_polar_differences_red, list_pairwise_polar_differences_blue]
@@ -348,7 +348,7 @@ class GalaxyAnalysis:
         raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
         if any(len(arr) != max_raw_len for arr in raw_arrays):
             print(f"Warning: Raw arrays have different lengths, padding to {max_raw_len} with NaN for saving raw pairwise polar color difference.")
-        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
+        # np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (Red)    Pairwise Polar Difference (degrees) (Blue)')
         
         return prob_polar_red_blue_plotter, polar_bin_centers_red, pairwise_polar_differences_red, pairwise_polar_red_errorbars, polar_bin_centers_blue, pairwise_polar_differences_blue, pairwise_polar_blue_errorbars
 
@@ -400,13 +400,13 @@ class GalaxyAnalysis:
         arrays = [polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_LT50_errorbars, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars]
         max_len = max(len(arr) for arr in arrays)
         arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
-        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Error Bar (<50 Satellites)    Probability Density (>150 Satellites)    Error Bar (>150 Satellites)')
+        # np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<50 Satellites)    Error Bar (<50 Satellites)    Probability Density (>150 Satellites)    Error Bar (>150 Satellites)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_memberNum/pairwise_polar_memberNum_difference_RAW_{self.plotIdentifier}.txt'
         raw_arrays = [list_pairwise_polar_differences_LT50, list_pairwise_polar_differences_GT150]
         max_raw_len = max(len(arr) for arr in raw_arrays)
         raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
-        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
+        # np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<50 Satellites)    Pairwise Polar Difference (degrees) (>150 Satellites)')
 
         return prob_polar_GT150_LT50_plotter, polar_bin_centers_GT150, pairwise_polar_differences_GT150, pairwise_polar_GT150_errorbars, polar_bin_centers_LT50, pairwise_polar_differences_LT50, pairwise_polar_LT50_errorbars
 
@@ -457,13 +457,13 @@ class GalaxyAnalysis:
         arrays = [polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars]
         max_len = max(len(arr) for arr in arrays)
         arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
-        np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Error Bar (<35% R200)    Probability Density (65-100% R200)    Error Bar (65-100% R200)')
+        # np.savetxt(output_data_file, np.column_stack(arrays_padded), header='Pairwise Polar Difference (degrees)    Probability Density (<35% R200)    Error Bar (<35% R200)    Probability Density (65-100% R200)    Error Bar (65-100% R200)')
         #save raw pairwise polar differences to text file
         output_data_file = self.scratchDataDirc + f'/pairwise_polar_radius/pairwise_polar_radius_difference_RAW_{self.plotIdentifier}.txt'
         raw_arrays = [list_pairwise_polar_differences_LT35R200, list_pairwise_polar_differences_GT65R200]
         max_raw_len = max(len(arr) for arr in raw_arrays)
         raw_arrays_padded = [np.pad(arr, (0, max_raw_len - len(arr)), constant_values=np.nan) for arr in raw_arrays]
-        np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
+        # np.savetxt(output_data_file, np.column_stack(raw_arrays_padded), header='Pairwise Polar Difference (degrees) (<35% R200)    Pairwise Polar Difference (degrees) (65-100% R200)')
     
         return prob_polar_LT35R200_GT65R200_plotter, polar_bin_centers_LT35R200, pairwise_polar_differences_LT35R200, pairwise_polar_LT35R200_errorbars, polar_bin_centers_GT65R200, pairwise_polar_differences_GT65R200, pairwise_polar_GT65R200_errorbars
 
@@ -1404,12 +1404,16 @@ class GalaxyAnalysis:
 
         self.plot_joining_redshift_distribution_by_mass_bins(list_of_mass_bin_galaxy_groups)
         
-    def overlay_polar_pairwise_across_redshifts(self, listRedshiftGG:list[list[tuple[ListGalaxyGroup, str]]], plot_dirc:str = None, polar_plotter=None, polar_fig=None, polar_ax=None, mrlOrPolar:str = 'polar', plotRows:int = 0, plotCols:int = 0):
+    def overlay_polar_pairwise_across_redshifts(self, listRedshiftGG:list[list[tuple[ListGalaxyGroup, str]]], plot_dirc:str = None, polar_plotter=None, polar_fig=None, polar_ax=None, mrlOrPolar:str = 'polar', plotRows:int = 0, plotCols:int = 0, oneaxis=False):
         if polar_plotter is None:
             polar_plotter = AstroPlotter()
         if polar_fig is None or polar_ax is None:
-            polar_fig, polar_ax = polar_plotter.create_figure(ncols=len(listRedshiftGG[0]), nrows=1, figsize=(8, 6*len(listRedshiftGG[0]))) if plotRows == 0 or plotCols == 0 else polar_plotter.create_figure(ncols=plotCols, nrows=plotRows, figsize=(8*plotCols, 6*plotRows)) 
-            polar_ax = polar_ax.flatten() if isinstance(polar_ax, np.ndarray) else np.array([polar_ax])  # Ensure polar_ax is always an array for consistent indexing
+            if not oneaxis:
+                polar_fig, polar_ax = polar_plotter.create_figure(ncols=len(listRedshiftGG[0]), nrows=1, figsize=(8, 6*len(listRedshiftGG[0]))) if plotRows == 0 or plotCols == 0 else polar_plotter.create_figure(ncols=plotCols, nrows=plotRows, figsize=(8*plotCols, 6*plotRows)) 
+                polar_ax = polar_ax.flatten() if isinstance(polar_ax, np.ndarray) else np.array([polar_ax])  # Ensure polar_ax is always an array for consistent indexing
+            else:
+                polar_fig, polar_ax = polar_plotter.create_figure(ncols=1, nrows=1, figsize=(8, 6))
+
         
         for redshift_index, listGG in enumerate(listRedshiftGG):
             for i, (listGalaxyGroup, label) in enumerate(listGG):
@@ -1423,7 +1427,7 @@ class GalaxyAnalysis:
                 ylabel = 'Probability Density' if mrlOrPolar == 'polar' else 'Probability Density of MRL Directionality'
                 title = f'Pairwise Polar Difference Distribution for {self.sim} Galaxy Groups in {label}' if mrlOrPolar == 'polar' else f'MRL Directionality of Pairwise Polar Difference for {self.sim} Galaxy Groups in {label}'
                 
-                if len(listGG) > 1:
+                if len(listGG) > 1 and not oneaxis:
                     print(f"choosing ax, {i}")
                     polar_ax_to_plot = polar_ax[i]
                 else:

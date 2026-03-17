@@ -100,7 +100,7 @@ class ListGalaxyGroup:
         if not self.listGalaxyGroups:
             return (0, 0)
         num_subhalos_list = [len(gg.getSatelliteSubhalos()) for gg in self.listGalaxyGroups]
-        return (min(num_subhalos_list), max(num_subhalos_list))
+        return (min(num_subhalos_list), max(num_subhalos_list)), num_subhalos_list
     
     def getListPairwiseDifferences(self) -> list[list[tuple[float, float, float]]]:
         return self.list_pairwise_differences
