@@ -2,6 +2,7 @@
 
 from myproject import GalaxyGroup, Subhalo, ListGalaxyGroup, AstroPlotter
 from myproject.utilities.joinTime import JoinTime
+import matplotlib.pyplot as plt
 import h5py as h5
 import numpy as np
 from typing import Optional
@@ -933,6 +934,11 @@ class GalaxyAnalysis:
             else:
                 overlayAxToPlot = overlayMRLAx
 
+            # cmap = plt.get_cmap('tab10')  # or 'viridis', 'plasma', etc.
+            # color = cmap(i / max(1, len(listGG)-1))
+            colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+            color = colors[i % len(colors)]
+
             overlayMRLPlotter.scatter_plot(
                 MRL_bin_centers, 
                 MRL_binned,
@@ -941,25 +947,27 @@ class GalaxyAnalysis:
                 # ylim = (0, 0.01),
                 label=f"MRL Directionality ({listGalaxyGroup.getNumGalaxyGroups()} Galaxy Groups in {label})",
                 output_filename=None,  # Disable saving for combined plot
+                overlay_color=color,
                 grid=True
             )
             #plot a small verticle line at 99th percentile of radnom MRL_values
             percentile_MRL = np.percentile(random_MRL_values, percentageMRL)
             # overlayMRLAx.axvline(percentile_MRL, linestyle='--', label=f'99th Percentile')
 
-            overlayMRLPlotter.scatter_plot(
-                random_MRL_bin_centers, 
-                random_MRL_bins,
-                # errorBars = random_MRL_errorbars,
-                ax=overlayAxToPlot,  # Use the same axis for overlay
-                # ylim = (0, 0.01),
-                label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
-                include_legend=True,
-                overlay_color='gray',
-                # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}{self.plotEndingFormat}',
-                output_filename=None,
-                grid=True,
-            )
+            # overlayMRLPlotter.scatter_plot(
+            #     random_MRL_bin_centers, 
+            #     random_MRL_bins,
+            #     # errorBars = random_MRL_errorbars,
+            #     ax=overlayAxToPlot,  # Use the same axis for overlay
+            #     # ylim = (0, 0.01),
+            #     label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
+            #     include_legend=True,
+            #     # overlay_color='gray',
+            #     overlay_color=color,
+            #     # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}{self.plotEndingFormat}',
+            #     output_filename=None,
+            #     grid=True,
+            # )
 
             overlayMRLPlotter.scatter_plot(
                 random_MRL_bin_centers, 
@@ -972,7 +980,8 @@ class GalaxyAnalysis:
                 # ylim = (0, 0.01),
                 label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
                 include_legend=True,
-                overlay_color='gray',
+                # overlay_color='gray',
+                overlay_color=color,
                 alpha=0,
                 # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}{self.plotEndingFormat}',
                 output_filename=None,
@@ -981,7 +990,7 @@ class GalaxyAnalysis:
                 spline_smoothing=0,
             )
             ymin, ymax = overlayAxToPlot.get_ylim()
-            overlayAxToPlot.plot([percentile_MRL, percentile_MRL], [ymin, ymax*0.1], color='blue', linestyle='--', label=f'{str(percentile_MRL)}th Percentile (20 Non-Centrals)')
+            # overlayAxToPlot.plot([percentile_MRL, percentile_MRL], [ymin, ymax*0.1], color='blue', linestyle='--', label=f'{str(percentile_MRL)}th Percentile (20 Non-Centrals)')
             print(f"99th percentile MRL: {percentile_MRL}")
             print(f"Overall number of MRL values above 99th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
             
