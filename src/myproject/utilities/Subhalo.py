@@ -4,7 +4,7 @@ import numpy as np
 
 class Subhalo:
 
-    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8], luminositiesSDSS : np.ndarray[1,8], group_pos : np.ndarray):
+    def __init__(self, idx : int, group_id : int, flag : int, mass : float, stellarMass : float, groupNumber : int, position : np.ndarray, halfMassRad : float, vmaxRadius : float, luminosities : np.ndarray[1,8], luminositiesSDSS : np.ndarray[1,8], group_pos : np.ndarray, joiningRedshift : np.ndarray = np.nan):
         """
         Constructor for Subhalo class.
 
@@ -20,6 +20,7 @@ class Subhalo:
             vmaxRadius (float): _Radius at which the maximum circular velocity is reached in kpc_
             luminosities (np.ndarray[1,8]): _array with 8 elements corresponding to U, B, V, K, g, r, i, z bands. Units: mag_
             group_pos (np.ndarray): _position of the parent galaxy group as a numpy array with 3 elements (x, y, z) in kpc_
+            joiningRedshift (np.ndarray, optional): _redshift at which the subhalo joined its current parent group, initialized to NaN and can be set later using setJoiningRedshift method_. Defaults to np.nan.
         """
         self.idx = idx # unique subhalo index
         self.group_id = group_id # ID of the parent galaxy group
@@ -33,6 +34,7 @@ class Subhalo:
         self.luminosities = luminosities # array with 8 elements corresponding to U, B, V, K, g, r, i, z bands. Units: mag
         self.luminositiesSDSS = luminositiesSDSS
         self.distanceToGroupCenter = np.linalg.norm(self.position - group_pos) # in kpc
+        self.joiningRedshift = joiningRedshift # redshift at which the subhalo joined its current parent group, initialized to NaN and can be set later using setJoiningRedshift method
         
     def getIdx(self):
         return self.idx
@@ -88,5 +90,14 @@ class Subhalo:
     def getDistanceToGroupCenter(self):
         return self.distanceToGroupCenter
     
+    def getJoiningRedshift(self):
+        return self.joiningRedshift[0] if self.joiningRedshift is not np.nan else np.nan
+    
+    def getJoiningRedshiftInfo(self):
+        return self.joiningRedshift
+    
     def setPosition(self, newPosition : np.ndarray):
         self.position = newPosition
+        
+    def setJoiningRedshiftInfo(self, joiningRedshift : np.ndarray):
+        self.joiningRedshift = joiningRedshift

@@ -470,7 +470,16 @@ class ListGalaxyGroup:
        
        
        
-    def save_to_hdf5(self, h5file: h5.File, overwrite: bool = True, parallize : bool = False, n_processes: Optional[int] = None):
+    def save_to_hdf5(
+        self,
+        h5file: h5.File,
+        overwrite: bool = True,
+        parallize: bool = False,
+        n_processes: Optional[int] = None,
+        storage_layout: str = 'attrs',
+        compression: Optional[str] = None,
+        compression_opts: Optional[int] = None,
+    ):
         '''
         Parallel version of save_to_hdf5 using multiprocessing.
         Serializes galaxy group data in parallel, then writes sequentially.
@@ -488,6 +497,9 @@ class ListGalaxyGroup:
         n_processes : int, optional
             Number of processes to use (default: CPU count - 1)
         '''
+        if storage_layout not in {'attrs', 'datasets'}:
+            raise ValueError("storage_layout must be 'attrs' or 'datasets'")
+
         if not overwrite:
             # Serial processing for append mode
             existing_groups = set(h5file['GalaxyGroups'].keys()) if 'GalaxyGroups' in h5file else set()
@@ -499,6 +511,9 @@ class ListGalaxyGroup:
             # Write header information
             for key, value in self.headerInformation.items():
                 h5file.attrs[key] = value
+
+            # Record the storage layout for future readers
+            h5file.attrs['ListGalaxyGroup_storage_layout'] = storage_layout
             
             total = len(self.listGalaxyGroups)
             
@@ -509,13 +524,19 @@ class ListGalaxyGroup:
             
             # Prepare arguments for parallel processing
             args_list = [(gg, i) for i, gg in enumerate(self.listGalaxyGroups)]
+
+            serializer = (
+                ListGalaxyGroup._serialize_galaxy_group
+                if storage_layout == 'attrs'
+                else ListGalaxyGroup._serialize_galaxy_group_datasets
+            )
             
             if parallize:
                 # Use imap to get results as they complete (allows progress tracking)
                 import multiprocessing as mp
                 with mp.Pool(processes=n_processes) as pool:
                     serialized_data = []
-                    for i, result in enumerate(pool.imap(ListGalaxyGroup._serialize_galaxy_group, args_list), 1):
+                    for i, result in enumerate(pool.imap(serializer, args_list), 1):
                         serialized_data.append(result)
                         percent = (i / total) * 100
                         print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -524,7 +545,7 @@ class ListGalaxyGroup:
                 print("Serializing galaxy group data sequentially...")
                 serialized_data = []
                 for i, args in enumerate(args_list, 1):
-                    result = ListGalaxyGroup._serialize_galaxy_group(args)
+                    result = serializer(args)
                     serialized_data.append(result)
                     percent = (i / total) * 100
                     print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -547,21 +568,46 @@ class ListGalaxyGroup:
                 gg_grp.attrs['pos'] = group_data['pos']
                 
                 subhalos_grp = gg_grp.create_group('Subhalos')
-                for j, subhalo_data in enumerate(group_data['subhalos']):
-                    sh_grp = subhalos_grp.create_group(f'Subhalo_{j}')
-                    sh_grp.attrs['idx'] = subhalo_data['idx']
-                    sh_grp.attrs['group_id'] = subhalo_data['group_id']
-                    sh_grp.attrs['flag'] = subhalo_data['flag']
-                    sh_grp.attrs['mass'] = subhalo_data['mass']
-                    sh_grp.attrs['stellarMass'] = subhalo_data['stellarMass']
-                    sh_grp.attrs['groupNumber'] = subhalo_data['groupNumber']
-                    sh_grp.attrs['position'] = subhalo_data['position']
-                    sh_grp.attrs['halfMassRad'] = subhalo_data['halfMassRad']
-                    sh_grp.attrs['vmaxRadius'] = subhalo_data['vmaxRadius']
-                    sh_grp.attrs['luminosities'] = subhalo_data['luminosities']
-                    sh_grp.attrs['luminositiesSDSS'] = subhalo_data['luminositiesSDSS']
+
+                if storage_layout == 'attrs':
+                    for j, subhalo_data in enumerate(group_data['subhalos']):
+                        sh_grp = subhalos_grp.create_group(f'Subhalo_{j}')
+                        sh_grp.attrs['idx'] = subhalo_data['idx']
+                        sh_grp.attrs['group_id'] = subhalo_data['group_id']
+                        sh_grp.attrs['flag'] = subhalo_data['flag']
+                        sh_grp.attrs['mass'] = subhalo_data['mass']
+                        sh_grp.attrs['stellarMass'] = subhalo_data['stellarMass']
+                        sh_grp.attrs['groupNumber'] = subhalo_data['groupNumber']
+                        sh_grp.attrs['position'] = subhalo_data['position']
+                        sh_grp.attrs['halfMassRad'] = subhalo_data['halfMassRad']
+                        sh_grp.attrs['vmaxRadius'] = subhalo_data['vmaxRadius']
+                        sh_grp.attrs['luminosities'] = subhalo_data['luminosities']
+                        sh_grp.attrs['luminositiesSDSS'] = subhalo_data['luminositiesSDSS']
+                        sh_grp.attrs['joinTimes'] = subhalo_data['joinTimes']
+                else:
+                    # Bulk datasets (significantly faster than many tiny groups/attrs)
+                    for field_name, arr in group_data['subhalos'].items():
+                        subhalos_grp.create_dataset(
+                            field_name,
+                            data=arr,
+                            compression=compression,
+                            compression_opts=compression_opts,
+                        )
             
             print(f"\nCompleted writing {len(serialized_data)} galaxy groups to HDF5.")
+
+    # ---------------------------------------------------------------------
+    # Faster HDF5 I/O notes
+    # ---------------------------------------------------------------------
+    # The current on-disk format (attrs + many small groups) is easy to
+    # inspect manually, but it is slow for large catalogs. The biggest
+    # bottlenecks are:
+    #   1) Creating thousands of HDF5 objects (groups/datasets)
+    #   2) Per-subhalo attribute writes/reads
+    #   3) In load, repeatedly recomputing central/satellites via addSubhalo()
+    #
+    # We keep the existing layout for backward compatibility, but the loader
+    # is optimized below to avoid O(n^2) behavior.
                     
     def load_from_hdf5(self, h5file : h5.File, parallelize: bool=False, n_processes: Optional[int]=None):
         self.listGalaxyGroups = []
@@ -586,7 +632,7 @@ class ListGalaxyGroup:
             with mp.Pool(processes=n_processes) as pool:
                 args_list = [(h5_filename, gg_key) for gg_key in gg_keys]
                 results = []
-                for i, result in enumerate(pool.imap(ListGalaxyGroup._load_group_from_hdf5, args_list), 1):
+                for i, result in enumerate(pool.imap(ListGalaxyGroup._load_group_from_hdf5_auto, args_list), 1):
                     results.append(result)
                     percent = (i / total) * 100
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -596,14 +642,14 @@ class ListGalaxyGroup:
         else:
             for i, gg_key in enumerate(gg_keys):
                 print(f"Progress: {i+1}/{total}", end='\r')
-                galaxyGroup = ListGalaxyGroup._load_group_from_hdf5((h5file.filename, gg_key))
+                galaxyGroup = ListGalaxyGroup._load_group_from_hdf5_auto((h5file.filename, gg_key))
                 self.listGalaxyGroups.append(galaxyGroup)
         
         self.lenGalaxyGroups = len(self.listGalaxyGroups)
         print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
 
     @staticmethod
-    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> List[tuple[np.ndarray, np.ndarray]]:
+    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> list[tuple[np.ndarray, np.ndarray]]:
         '''
         Docstring for compute_an_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
         
@@ -704,8 +750,12 @@ class ListGalaxyGroup:
             MCrit200 = gg_grp.attrs['MCrit200']
             posCM = gg_grp.attrs['posCM']
             pos = gg_grp.attrs['pos']
-            galaxyGroup = GalaxyGroup(galaxy_group_id, RCrit200, MCrit200, posCM, pos, listSubhalos=[])
-            
+
+            # Important performance detail:
+            # Avoid GalaxyGroup.addSubhalo() in a loop here.
+            # addSubhalo() recomputes central/satellites every append, which is
+            # O(n^2) per group. Instead, build the list once, then initialize.
+            subhalos: list[Subhalo] = []
             subhalos_grp = gg_grp['Subhalos']
             for sh_key in subhalos_grp:
                 sh_grp = subhalos_grp[sh_key]
@@ -720,11 +770,201 @@ class ListGalaxyGroup:
                 vmaxRadius = sh_grp.attrs['vmaxRadius']
                 luminosities = sh_grp.attrs['luminosities']
                 luminositiesSDSS = sh_grp.attrs['luminositiesSDSS']
-                
-                subhalo = Subhalo(idx, group_id, flag, mass, stellarMass, groupNumber, position, halfMassRad, vmaxRadius, luminosities, luminositiesSDSS, group_pos=pos)
-                galaxyGroup.addSubhalo(subhalo)
-        
-        return galaxyGroup
+                joinTimes = sh_grp.attrs['joinTimes']
+
+                subhalos.append(
+                    Subhalo(
+                        idx,
+                        group_id,
+                        flag,
+                        mass,
+                        stellarMass,
+                        groupNumber,
+                        position,
+                        halfMassRad,
+                        vmaxRadius,
+                        luminosities,
+                        luminositiesSDSS,
+                        group_pos=pos,
+                        joiningRedshift=joinTimes,
+                    )
+                )
+
+            galaxyGroup = GalaxyGroup(galaxy_group_id, RCrit200, MCrit200, posCM, pos, listSubhalos=subhalos)
+            return galaxyGroup
+
+    @staticmethod
+    def _load_group_from_hdf5_auto(args):
+        """Auto-detect loader for either 'attrs' or 'datasets' subhalo storage."""
+        import h5py as h5
+
+        h5_filename, gg_key = args
+        with h5.File(h5_filename, 'r') as h5file:
+            gg_grp = h5file['GalaxyGroups'][gg_key]
+            if 'Subhalos' in gg_grp and 'idx' in gg_grp['Subhalos']:
+                return ListGalaxyGroup._load_group_from_hdf5_datasets(args)
+        return ListGalaxyGroup._load_group_from_hdf5(args)
+
+    @staticmethod
+    def _load_group_from_hdf5_datasets(args):
+        """Load a single galaxy group from the faster dataset-based layout."""
+        import h5py as h5
+        import numpy as np
+        from myproject.utilities.Subhalo import Subhalo
+        from myproject.utilities.GalaxyGroup import GalaxyGroup
+
+        h5_filename, gg_key = args
+        with h5.File(h5_filename, 'r') as h5file:
+            gg_grp = h5file['GalaxyGroups'][gg_key]
+            galaxy_group_id = gg_grp.attrs['group_id']
+            RCrit200 = gg_grp.attrs['RCrit200']
+            MCrit200 = gg_grp.attrs['MCrit200']
+            posCM = gg_grp.attrs['posCM']
+            pos = gg_grp.attrs['pos']
+
+            sh_grp = gg_grp['Subhalos']
+            idx = sh_grp['idx'][:]
+            group_id = sh_grp['group_id'][:]
+            flag = sh_grp['flag'][:]
+            mass = sh_grp['mass'][:]
+            stellarMass = sh_grp['stellarMass'][:]
+            groupNumber = sh_grp['groupNumber'][:]
+            position = sh_grp['position'][:]
+            halfMassRad = sh_grp['halfMassRad'][:]
+            vmaxRadius = sh_grp['vmaxRadius'][:]
+            luminosities = sh_grp['luminosities'][:]
+            luminositiesSDSS = sh_grp['luminositiesSDSS'][:]
+            joinTimes = sh_grp['joinTimes'][:]
+
+            subhalos: list[Subhalo] = []
+            n = len(idx)
+            for i in range(n):
+                jt_arr = np.asarray(joinTimes[i])
+                subhalos.append(
+                    Subhalo(
+                        int(idx[i]),
+                        int(group_id[i]),
+                        int(flag[i]),
+                        mass[i],
+                        float(stellarMass[i]),
+                        int(groupNumber[i]),
+                        position[i],
+                        float(halfMassRad[i]),
+                        float(vmaxRadius[i]),
+                        luminosities[i],
+                        luminositiesSDSS[i],
+                        group_pos=pos,
+                        joiningRedshift=jt_arr,
+                    )
+                )
+
+            return GalaxyGroup(galaxy_group_id, RCrit200, MCrit200, posCM, pos, listSubhalos=subhalos)
+
+    @staticmethod
+    def _serialize_galaxy_group_datasets(args: tuple[GalaxyGroup, int]):
+        """Serialize a galaxy group into bulk NumPy arrays (fast HDF5 datasets)."""
+        import numpy as np
+
+        galaxyGroup, i = args
+        subhalos = list(galaxyGroup.getSubhalos())
+        n = len(subhalos)
+
+        def _as_1d_array(x):
+            arr = np.asarray(x)
+            return arr.ravel() if arr.shape != () else arr.reshape(1)
+
+        if n == 0:
+            mass_len = 6
+            lum_len = 8
+            join_len = 15
+        else:
+            mass_len = _as_1d_array(subhalos[0].getMass()).size
+            lum_len = _as_1d_array(subhalos[0].getLuminosities()).size
+            join_len = 1
+            for sh in subhalos:
+                jt = sh.getJoiningRedshiftInfo()
+                if jt is np.nan:
+                    continue
+                try:
+                    arr = _as_1d_array(jt)
+                except Exception:
+                    continue
+                join_len = max(join_len, arr.size)
+
+        idx = np.empty(n, dtype=np.int64)
+        group_id = np.empty(n, dtype=np.int64)
+        flag = np.empty(n, dtype=np.int16)
+        stellarMass = np.empty(n, dtype=np.float64)
+        groupNumber = np.empty(n, dtype=np.int64)
+        position = np.empty((n, 3), dtype=np.float64)
+        halfMassRad = np.empty(n, dtype=np.float64)
+        vmaxRadius = np.empty(n, dtype=np.float64)
+
+        mass = np.empty((n, mass_len), dtype=np.float64)
+        luminosities = np.empty((n, lum_len), dtype=np.float64)
+        luminositiesSDSS = np.empty((n, lum_len), dtype=np.float64)
+        joinTimes = np.full((n, join_len), np.nan, dtype=np.float64)
+
+        for j, sh in enumerate(subhalos):
+            idx[j] = sh.getIdx()
+            group_id[j] = sh.getGroupID()
+            flag[j] = sh.getFlag()
+            stellarMass[j] = sh.getStellarMass()
+            groupNumber[j] = sh.getGroupNumber()
+            position[j] = sh.getPosition()
+            halfMassRad[j] = sh.getHalfMassRad()
+            vmaxRadius[j] = sh.getVmaxRadius()
+
+            m = _as_1d_array(sh.getMass())
+            if m.size != mass_len:
+                raise ValueError(
+                    f"Inconsistent mass vector length in group {galaxyGroup.getGroupID()}: expected {mass_len}, got {m.size}"
+                )
+            mass[j] = m
+
+            lum = _as_1d_array(sh.getLuminosities())
+            if lum.size != lum_len:
+                raise ValueError(
+                    f"Inconsistent luminosities length in group {galaxyGroup.getGroupID()}: expected {lum_len}, got {lum.size}"
+                )
+            luminosities[j] = lum
+
+            lum_sdss = _as_1d_array(sh.getLuminositiesSDSS())
+            if lum_sdss.size != lum_len:
+                raise ValueError(
+                    f"Inconsistent SDSS luminosities length in group {galaxyGroup.getGroupID()}: expected {lum_len}, got {lum_sdss.size}"
+                )
+            luminositiesSDSS[j] = lum_sdss
+
+            jt = sh.getJoiningRedshiftInfo()
+            if jt is not np.nan:
+                jt_arr = _as_1d_array(jt)
+                joinTimes[j, : jt_arr.size] = jt_arr
+
+        group_data = {
+            'index': i,
+            'group_id': galaxyGroup.getGroupID(),
+            'RCrit200': galaxyGroup.getRCrit200(),
+            'MCrit200': galaxyGroup.getMCrit200(),
+            'posCM': galaxyGroup.getPosCM(),
+            'pos': galaxyGroup.getPos(),
+            'subhalos': {
+                'idx': idx,
+                'group_id': group_id,
+                'flag': flag,
+                'mass': mass,
+                'stellarMass': stellarMass,
+                'groupNumber': groupNumber,
+                'position': position,
+                'halfMassRad': halfMassRad,
+                'vmaxRadius': vmaxRadius,
+                'luminosities': luminosities,
+                'luminositiesSDSS': luminositiesSDSS,
+                'joinTimes': joinTimes,
+            },
+        }
+
+        return group_data
 
     @staticmethod
     def _compute_pairwise_for_group(galaxyGroup : GalaxyGroup) -> list[tuple[float, float, float]]:
@@ -1051,7 +1291,8 @@ class ListGalaxyGroup:
                 'halfMassRad': subhalo.getHalfMassRad(),
                 'vmaxRadius': subhalo.getVmaxRadius(),
                 'luminosities': subhalo.getLuminosities(),
-                'luminositiesSDSS': subhalo.getLuminositiesSDSS()
+                'luminositiesSDSS': subhalo.getLuminositiesSDSS(),
+                'joinTimes' : subhalo.getJoiningRedshiftInfo()
             }
             group_data['subhalos'].append(subhalo_data)
         
