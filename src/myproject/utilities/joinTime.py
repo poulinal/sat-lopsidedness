@@ -48,6 +48,17 @@ class JoinTime():
         """
 
 
+        def _as_1d(x):
+            return np.atleast_1d(np.asarray(x))
+
+        def _as_2d(x, width: int | None = None):
+            arr = np.asarray(x)
+            if arr.ndim == 1:
+                if width is not None and arr.size == width:
+                    return arr.reshape(1, width)
+                return arr.reshape(1, -1)
+            return arr
+
         #fetch the merger tree for the satellite
         try:
             mpb1 = self.gettree(ID, fname)
@@ -55,18 +66,18 @@ class JoinTime():
             print(f'No merger tree for satellite {ID}: {e}')
             return None
         try:
-            f = h5.File(mpb1,'r')
+            with h5.File(mpb1,'r') as f:
+                #grPos = f['GroupPos'][:]
+                subPos = _as_2d(f['SubhaloPos'][()], width=3)
+                #grR200 = f['Group_R_Crit200'][:]
+                snapnum = _as_1d(f['SnapNum'][()])
+                #grVel = f['GroupVel'][:]
+                subVel = _as_2d(f['SubhaloVel'][()], width=3)
+                subMasstype = _as_2d(f['SubhaloMassType'][()])
+                progID = _as_1d(f['SubfindID'][()])
         except Exception as e:
-            print(f'Could not open merger tree file for satellite {ID}: {e}')
+            print(f'Could not open/read merger tree file for satellite {ID}: {e}')
             return None
-        #grPos = f['GroupPos'][:]
-        subPos = f['SubhaloPos'][:]
-        #grR200 = f['Group_R_Crit200'][:]
-        snapnum= f['SnapNum'][:]
-        #grVel = f['GroupVel'][:]
-        subVel = f['SubhaloVel'][:]
-        subMasstype = f['SubhaloMassType'][:]
-        progID = f['SubfindID'][:]
         
         #fetch the merger tree for the satellite's host
 
@@ -75,12 +86,15 @@ class JoinTime():
         except HTTPError as e:
             print(f'No merger tree for host {hostID}: {e}')
             return None
-        #print(mpbhost)
-        fh = h5.File(mpbhost,'r')
-        grPos = fh['GroupPos'][:]
-        grR200 = fh['Group_R_Crit200'][:]
-        grVel = fh['SubhaloVel'][:]
-        hostprog = fh['SubhaloID']
+        try:
+            with h5.File(mpbhost,'r') as fh:
+                grPos = _as_2d(fh['GroupPos'][()], width=3)
+                grR200 = _as_1d(fh['Group_R_Crit200'][()])
+                grVel = _as_2d(fh['SubhaloVel'][()], width=3)
+                hostprog = _as_1d(fh['SubhaloID'][()])
+        except Exception as e:
+            print(f'Could not open/read merger tree file for host {hostID}: {e}')
+            return None
         
 
         # to compare distances, first make arrays the same shapes
@@ -95,13 +109,16 @@ class JoinTime():
             subVel=subVel[0:len(grPos),:]
             snapnum = snapnum[0:len(grPos)]
             subMasstype = subMasstype[0:len(grPos),:]
+            progID = progID[0:len(grPos)]
 
         
         #Taking a square root is computationally inefficient.
         #Because distance in 3D is calculated with x^2+y^2+z^2 = distance^2,
         #I just work with distances in squares until the last step
 
-        grR200sq = 9*np.multiply(grR200,grR200) #looking within 3R200 to get joining time for more satellites
+        grR200sq = np.multiply(grR200,grR200) #looking within 3R200 to get joining time for more satellites
+        
+        gr3R200sq = 9*np.multiply(grR200,grR200) #looking within 3R200 to get joining time for more satellites
         
         #Find the relative distance between two galaxies
         difpos=np.subtract(subPos,grPos)
@@ -117,7 +134,7 @@ class JoinTime():
         distsq=np.sum(np.square(difpos),axis=1)
 
 
-        wh=np.nonzero((distsq<grR200sq))
+        wh=np.nonzero((distsq<gr3R200sq))
         
         #print(wh.any)
         #Separation at z=0
@@ -127,13 +144,40 @@ class JoinTime():
         closeind = np.argmin(distsq)
         closest = np.sqrt(distsq[closeind])
         closest_norm = closest/grR200[closeind]
-        closest_z = self.getredshift(snapnum[closeind])
+        closest_z = self.getredshift(int(snapnum[closeind]))
+        
+        #Find when the satellite first crosses one,two,three R_200
+        #aka find the index at which the distsq less than the correesponding R200sq
+        cross1R200ind = np.nonzero((distsq<=1*grR200sq))
+        cross2R200ind = np.nonzero((distsq<=4*grR200sq))
+        cross3R200ind = np.nonzero((distsq<=9*grR200sq))
+        if cross1R200ind is not None and len(cross1R200ind[0])>0:
+            inside = snapnum[cross1R200ind]
+            first1R200JoinSnap = int(inside[np.argmin(inside)])
+            first1R200Redshift = self.getredshift(first1R200JoinSnap)
+        else:
+            first1R200Redshift = np.nan
+            
+        if cross2R200ind is not None and len(cross2R200ind[0])>0:
+            inside = snapnum[cross2R200ind]
+            first2R200JoinSnap = int(inside[np.argmin(inside)])
+            first2R200Redshift = self.getredshift(first2R200JoinSnap)
+        else:
+            first2R200Redshift = np.nan
+            
+        if cross3R200ind is not None and len(cross3R200ind[0])>0:
+            inside = snapnum[cross3R200ind]
+            first3R200JoinSnap = int(inside[np.argmin(inside)])
+            first3R200Redshift = self.getredshift(first3R200JoinSnap)
+        else:
+            first3R200Redshift = np.nan
+        
         
         if len(wh[0])==0: 
             #in some cases, the satellite has never approached within the required distance
             #this shouldn't trigger when satellite joining redshift is defined by SubhaloGrNr
             # print('not within 3')
-            return(np.nan,sep_z0,sep_norm, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, closest,closest_norm,closest_z, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan)
+            return(np.nan,sep_z0,sep_norm, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, closest,closest_norm,closest_z, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan)
         
         #find the index at which the satellite joined 
         joinind = max(wh[0])
@@ -144,7 +188,7 @@ class JoinTime():
         #print(whinside)
         minind = np.argmin(whinside)
         
-        joinsnap=whinside[minind]
+        joinsnap=int(whinside[minind])
         joinprog = whID[minind]
         #print(joinsnap, snapnum, len(snapnum))
         joinred = self.getredshift(joinsnap)
@@ -196,6 +240,6 @@ class JoinTime():
         
         s_mass_j = subMasstype[joinind][4]
         
-        hostprog_ID  = hostprog[joinind]
+        hostprog_ID  = hostprog[joinind] if joinind < len(hostprog) else hostprog[-1]
         
-        return(joinred,sep_z0,sep_norm, del_M, del_T_all, del_T_lim, del_M_total,del_M_dm, del_M_stars,del_vsq,joinsnap,closest, closest_norm, closest_z, joinprog, del_L, s_mass_j, hostprog_ID, L_join, L_0)
+        return(joinred,sep_z0,sep_norm, del_M, del_T_all, del_T_lim, del_M_total,del_M_dm, del_M_stars,del_vsq,joinsnap,closest, closest_norm, closest_z, joinprog, del_L, s_mass_j, hostprog_ID, L_join, L_0, first1R200Redshift, first2R200Redshift, first3R200Redshift)

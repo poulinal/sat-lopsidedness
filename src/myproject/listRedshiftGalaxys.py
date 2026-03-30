@@ -14,6 +14,9 @@ class ListRedshiftGalaxy:
     
     def getAllGalaxyAnalysis(self):
         return self.galaxy_dic.values()
+
+    def getAllLoadedSnapshots(self):
+        return list(self.galaxy_dic.keys())
     
     def addGalaxyAnalysis(self, snapshot_enum : str, galaxy_analysis : GalaxyAnalysis):
         self.galaxy_dic[snapshot_enum] = galaxy_analysis
@@ -24,5 +27,5 @@ class ListRedshiftGalaxy:
         if simulation not in ['TNG300-1', 'TNG-Cluster']:
             raise ValueError("Invalid simulation. Must be 'TNG300-1' or 'TNG-Cluster'.")
         for snapshot_enum in snapshot_enums:
-            galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot_enum=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType)
+            galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType)
             self.addGalaxyAnalysis(snapshot_enum, galaxy_analysis)

@@ -68,7 +68,7 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
     Routine to pull data from online
     Credit to TNG team
     """
-    print(f"Fetching data from {path} with params {params} and saving to {fName}")
+    # print(f"Fetching data from {path} with params {params} and saving to {fName}")
 
     # r = requests.get('https://www.tng-project.org/api/', headers=headers)
     # print(r.status_code)  # should be 200
@@ -99,21 +99,21 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
 
     if r.headers['content-type'] == 'application/json':
         response = r.json()
-        print(f"JSON response: {response}")  # <-- add this
+        # print(f"JSON response: {response}")  # <-- add this
         return response
         # return r.json() # parse json responses automatically
 
-    print(f"Saving data to {fName}")
+    # print(f"Saving data to {fName}")
     dataFile=fName+'.hdf5'
     # Saves to file, currently disabled
-    print(r.headers)
+    # print(r.headers)
     if 'content-disposition' in r.headers:
         filename = r.headers['content-disposition'].split("filename=")[1]
         with open(dataFile, 'wb') as f:
             f.write(r.content)
         return dataFile # return the filename string
 
-    print(f"Saving data to {dataFile} where r: {r}")
+    # print(f"Saving data to {dataFile} where r: {r}")
     return r
 
 

@@ -908,9 +908,12 @@ class GalaxyAnalysis:
         fraction = count_less_than_percentile / total_count if total_count > 0 else 0
         return fraction, count_less_than_percentile, total_count
 
-    def getPercentOfClustersAboveRandomMRLCL(self, listGG : ListGalaxyGroup, percentageMRL:float = 0.99*100) -> float:
+    def getPercentOfClustersAboveRandomMRLCL(self, listGG : ListGalaxyGroup, percentageMRL:float = 0.99*100, random_mrl_values:list[list[float]] = None) -> float:
         MRL_values = listGG.compute_probablity_distribution_of_MRL_directionality(parallelize=False) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
-        random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=1000) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
+        if random_mrl_values is None:
+            random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=1000) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
+        else:
+            random_MRL_values = random_mrl_values
         fraction_above_percentile, count_above_percentile, total_count = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
         print(f"Fraction of MRL values below the {percentageMRL}th percentile of random MRL values: {fraction_above_percentile:.4f} ({count_above_percentile}/{total_count})")
         return (fraction_above_percentile, count_above_percentile, total_count), MRL_values, random_MRL_values

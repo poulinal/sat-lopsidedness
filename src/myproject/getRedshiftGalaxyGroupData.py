@@ -4,6 +4,8 @@ from myproject.utilities.joinTime import JoinTime
 import os
 import h5py as h5
 import numpy as np
+import multiprocessing as mp
+from myproject.utilities.parallelTools import get_optimal_processes
 
 from typing import Optional
 
@@ -78,12 +80,12 @@ class GalaxyGroupData:
     def computeAllData(self, additionalFileIdentifier:str=''):
         for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
-                if snapshot == 99:
+                if snapshot != 99:
                     print(f"previously got all data for {snapshot}")
                     continue
-                if snapshot > 84:
-                    print(f"previously got all data for {snapshot}")
-                    continue
+                # if snapshot > 60:
+                #     print(f"previously got all data for {snapshot}")
+                #     continue
                 if snapshot < 50:
                     print(f"Skipping redshifts less than snapshot 50 aka redshift 1.5 due to smoothing length change, {snapshot}")
                     continue
@@ -94,7 +96,7 @@ class GalaxyGroupData:
                 self.getGroupData(sim, snapshot)
                 self.getListGalaxyGroup()
                 self.correctTheData()
-                self.get_satellite_join_time(self.filtered_and_corrected_list_galaxy_groups) if snapshot == 99 else None
+                self.get_satellite_join_time(self.filtered_and_corrected_list_galaxy_groups, parallelize=True, rewrite=False) if snapshot == 99 else None
                 self.saveListGalaxyGroup(additionalFileIdentifier)
                 print(f"Finished processing for sim: {sim}, snapshot: {snapshot} of index {i}/{len(self.snapshot_dic.keys())}")
                 
@@ -365,78 +367,298 @@ class GalaxyGroupData:
         return groupPos
     
     
-    def get_satellite_join_time(self, listGalaxyGroups : ListGalaxyGroup, rewrite:Optional[bool] = None):
+    # def get_satellite_join_time(self, listGalaxyGroups : ListGalaxyGroup, rewrite:Optional[bool] = None):
+    #     #Box boundary 
+    #     # L=75000. #kpc
+    #     # halfbox=L/2.   
+    #     # h=0.6774 
+    #     joinTime = JoinTime(self.sim, self.snapshot)
+    #     if rewrite is None:
+    #         # rewrite = self.generalRewrite
+    #         rewrite=True
+
+    #     totalSatellites = sum(gg.getNumSubhalos() for gg in listGalaxyGroups.getAllGalaxyGroups())
+    #     processedSatelliteIds = []
+    #     print(f"Total number of satellites to process: {totalSatellites}")
+
+    #     processedJoinTimes = []
+        
+    #     satellitesWihtoutMergerTree = []
+    #     #load satellitesWihtoutMergerTree from file if exists
+    #     # if rewrite==True:
+    #     if os.path.exists(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
+    #         with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'r') as f:
+    #             lines = f.readlines()
+    #             for line in lines[1:]:  # Skip header line
+    #                 parts = line.split('\t')
+    #                 if len(parts) > 0:
+    #                     satellitesWihtoutMergerTree.append(int(parts[0]))
+    #         print(f"Loaded {len(satellitesWihtoutMergerTree)} satellites without merger tree from file.")
+    #     else:
+    #         print("No existing file for satellites without merger tree found, starting with an empty list.")
+    #         #prep the file with header
+    #         with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
+    #             f.write("SatelliteSubhaloID\n")
+        
+    #     #get all join times
+    
+    #     if not rewrite:
+    #         #check if file already exists, if so, skip
+    #         if os.path.exists(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
+    #             print(f"File join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt already exists, skipping...")
+    #     else:
+    #         with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
+    #             f.write("GalaxyGroupID\tSubhaloID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
+    #             for gg in listGalaxyGroups.getAllGalaxyGroups():
+    #                 # print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
+    #                 gg_id = gg.getGroupID()
+    #                 num_members = gg.getNumSubhalos()
+    #                 cluster_mass = gg.getMCrit200()
+    #                 #get the subhalo ID of the central galaxy, which is the one that joins the host halo
+    #                 central_subhalo : GalaxyGroup = gg.getCentralSubhalo()
+    #                 for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
+    #                     if central_subhalo is not None:
+    #                         # print(f"id: {subhalo.getIdx()}")
+    #                         #check if satellite has no merger tree
+    #                         if subhalo.getIdx() in satellitesWihtoutMergerTree:
+    #                             print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
+    #                             continue
+    #                         print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
+    #                         join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getIdx(), ID=subhalo.getIdx(), L=self.sim_boxsize_kpc, halfbox=self.sim_boxsize_kpc/2, fname=self.scratchDataDirc+'/mergerTree')
+    #                         processedSatelliteIds.append(subhalo.getIdx())
+    #                         if join_time_info is None:
+    #                             print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
+    #                             satellitesWihtoutMergerTree.append(subhalo.getIdx())
+    #                             #write into file
+    #                             with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'a') as g:
+    #                                 g.write(f"{subhalo.getIdx()}\n")
+    #                             continue
+    #                         f.write(f"{gg_id}\t{subhalo.getIdx()}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
+    #                         processedJoinTimes.append(join_time_info[0])
+    #                         subhalo.setJoiningRedshiftInfo(join_time_info)
+    #                         # if i == 0:
+    #                             # print(f"jointime: {join_time_info[0]}")
+    #     print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}, expected: {totalSatellites}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
+    
+    
+    
+    
+    
+    def get_satellite_join_time(
+        self,
+        listGalaxyGroups: ListGalaxyGroup,
+        rewrite: Optional[bool] = None,
+        parallelize: bool = False,
+        n_processes: Optional[int] = None,
+        chunk_size: Optional[int] = None,
+    ):
         #Box boundary 
         # L=75000. #kpc
         # halfbox=L/2.   
         # h=0.6774 
-        joinTime = JoinTime(self.sim, self.snapshot)
         if rewrite is None:
             # rewrite = self.generalRewrite
             rewrite=True
 
+        join_times_path = self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'
+        satellites_without_tree_path = self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'
+
+        join_times_header = (
+            "GalaxyGroupID\tSubhaloID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\t"
+            "DeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\t"
+            "ClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n"
+        )
+
         totalSatellites = sum(gg.getNumSubhalos() for gg in listGalaxyGroups.getAllGalaxyGroups())
-        processedSatelliteIds = []
-        print(f"Total number of satellites to process: {totalSatellites}")
+        print(f"Total number of satellites to process (including centrals in counts): {totalSatellites}")
 
         processedJoinTimes = []
         
-        satellitesWihtoutMergerTree = []
+        satellitesWihtoutMergerTree: set[int] = set()
         #load satellitesWihtoutMergerTree from file if exists
         # if rewrite==True:
-        if os.path.exists(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
-            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'r') as f:
-                lines = f.readlines()
-                for line in lines[1:]:  # Skip header line
-                    parts = line.split('\t')
-                    if len(parts) > 0:
-                        satellitesWihtoutMergerTree.append(int(parts[0]))
+        if os.path.exists(satellites_without_tree_path):
+            with open(satellites_without_tree_path, 'r') as f:
+                for line in f:
+                    s = line.strip()
+                    if not s or s.lower().startswith('satellitesubhaloid'):
+                        continue
+                    try:
+                        satellitesWihtoutMergerTree.add(int(s.split('\t')[0]))
+                    except Exception:
+                        continue
             print(f"Loaded {len(satellitesWihtoutMergerTree)} satellites without merger tree from file.")
         else:
             print("No existing file for satellites without merger tree found, starting with an empty list.")
             #prep the file with header
-            with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
+            with open(satellites_without_tree_path, 'w') as f:
                 f.write("SatelliteSubhaloID\n")
         
-        #get all join times
-    
-        if not rewrite:
-            #check if file already exists, if so, skip
-            if os.path.exists(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt'):
-                print(f"File join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt already exists, skipping...")
+        # If not rewriting, resume from existing join-times file when available.
+        completed_satellite_ids: set[int] = set()
+        join_file_mode = 'w'
+        should_write_header = True
+        if not rewrite and os.path.exists(join_times_path):
+            join_file_mode = 'a'
+            should_write_header = os.path.getsize(join_times_path) == 0
+            try:
+                with open(join_times_path, 'r') as f:
+                    for line in f:
+                        s = line.strip()
+                        if not s or s.lower().startswith('galaxygroupid'):
+                            continue
+                        parts = s.split('\t')
+                        if len(parts) < 2:
+                            continue
+                        try:
+                            completed_satellite_ids.add(int(parts[1]))
+                        except Exception:
+                            continue
+                print(
+                    f"Resuming from existing {os.path.basename(join_times_path)}: "
+                    f"{len(completed_satellite_ids)} satellites already completed."
+                )
+            except Exception as e:
+                print(f"WARNING: Failed to read existing join-times file for resume ({e}); will append anyway.")
+
+        if rewrite:
+            join_file_mode = 'w'
+            should_write_header = True
+
+        # Build tasks (one per satellite)
+        tasks: list[tuple] = []
+        for gg in listGalaxyGroups.getAllGalaxyGroups():
+            gg_id = gg.getGroupID()
+            num_members = gg.getNumSubhalos()
+            cluster_mass = gg.getMCrit200()
+            central_subhalo = gg.getCentralSubhalo()
+            if central_subhalo is None:
+                continue
+
+            host_id = central_subhalo.getIdx()
+            for subhalo in gg.getSatelliteSubhalos():
+                sat_id = subhalo.getIdx()
+                if sat_id in satellitesWihtoutMergerTree:
+                    continue
+                if sat_id in completed_satellite_ids:
+                    continue
+                tasks.append(
+                    (
+                        self.sim,
+                        self.snapshot,
+                        host_id,
+                        sat_id,
+                        self.sim_boxsize_kpc,
+                        self.sim_boxsize_kpc/2,
+                        self.scratchDataDirc + '/mergerTree',
+                        gg_id,
+                        num_members,
+                        cluster_mass,
+                    )
+                )
+
+        if len(tasks) == 0:
+            if completed_satellite_ids:
+                print("No satellites left to process (resume file already contains all targets).")
+            else:
+                print("No satellites to process (after filtering).")
+            return
+
+        if parallelize:
+            if n_processes is None:
+                try:
+                    # Prefer the module-level import when available
+                    n_processes = get_optimal_processes(len(tasks))
+                except NameError:
+                    # Notebook / partial-import safety
+                    from myproject.utilities.parallelTools import get_optimal_processes as _get_optimal_processes
+
+                    n_processes = _get_optimal_processes(len(tasks))
+                except Exception:
+                    n_processes = max(1, mp.cpu_count() - 1)
+            if chunk_size is None:
+                chunk_size = max(1, len(tasks) // (n_processes * 8))
+            print(f"Computing join times in parallel: {len(tasks)} satellites, {n_processes} processes, chunksize={chunk_size}")
         else:
-            with open(self.scratchPlotDirc + f'/join_times_and_parameter_changes_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'w') as f:
-                f.write("GalaxyGroupID\tNumMembers\tClusterMass\tJoiningRedshift\tSeparationAtZ0\tSeparationNormAtZ0\tDeltaGasMass\tDeltaTotalMass\tDeltaDMMass\tDeltaStellarMass\tDeltaVelSq\tJoiningSnap\tClosestApproach\tClosestApproachNorm\tClosestApproachRedshift\tJoinProgID\tDeltaAngularMomentum\tSatelliteMassAtJoining\tHostProgID\n")
-                for gg in listGalaxyGroups.getAllGalaxyGroups():
-                    # print(f"Processing Galaxy Group ID: {gg.getGroupID()}")
-                    gg_id = gg.getGroupID()
-                    num_members = gg.getNumSubhalos()
-                    cluster_mass = gg.getMCrit200()
-                    #get the subhalo ID of the central galaxy, which is the one that joins the host halo
-                    central_subhalo : GalaxyGroup = gg.getCentralSubhalo()
-                    for i, subhalo in enumerate(gg.getSatelliteSubhalos()):
-                        if central_subhalo is not None:
-                            # print(f"id: {subhalo.getIdx()}")
-                            #check if satellite has no merger tree
-                            if subhalo.getIdx() in satellitesWihtoutMergerTree:
-                                print(f"Skipping subhalo {subhalo.getIdx()} (previously identified as having no merger tree)")
-                                continue
-                            print(f"Processing subhalo {subhalo.getIdx()}, progress: {i}/{num_members-1} satellites in this group, total progress: {len(processedSatelliteIds)}/{totalSatellites} satellites", end='\r', flush=True)
-                            join_time_info = joinTime.computeJoinTimes(hostID=central_subhalo.getIdx(), ID=subhalo.getIdx(), L=self.L, halfbox=self.halfbox, fname=self.scratchDataDirc+'/mergerTree')
-                            processedSatelliteIds.append(subhalo.getIdx())
-                            if join_time_info is None:
-                                print(f"Skipping subhalo {subhalo.getIdx()} (no merger tree available)")
-                                satellitesWihtoutMergerTree.append(subhalo.getIdx())
-                                #write into file
-                                with open(self.scratchPlotDirc + f'/satellites_without_merger_tree_{self.sim}_{self.snapshot_dic[self.snapshot][1]}.txt', 'a') as g:
-                                    g.write(f"{subhalo.getIdx()}\n")
-                                continue
-                            f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{join_time_info[0]}\t{join_time_info[1]}\t{join_time_info[2]}\t{join_time_info[3]}\t{join_time_info[4]}\t{join_time_info[5]}\t{join_time_info[6]}\t{join_time_info[7]}\t{join_time_info[8]}\t{join_time_info[9]}\t{join_time_info[10]}\t{join_time_info[11]}\t{join_time_info[12]}\t{join_time_info[13]}\t{join_time_info[14]}\n")
-                            processedJoinTimes.append(join_time_info[0])
-                            subhalo.setJoiningRedshiftInfo(join_time_info)
-                            # if i == 0:
-                                # print(f"jointime: {join_time_info[0]}")
-        print(f"\nFinished processing all satellites. Total processed: {len(processedSatelliteIds)}, expected: {totalSatellites}. Satellites without merger tree: {len(satellitesWihtoutMergerTree)}, with non nan join times: {len(np.where(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}")
-    
-    
-    
+            print(f"Computing join times serially: {len(tasks)} satellites")
+
+        newly_missing_tree: list[int] = []
+        completed = 0
+        total = len(tasks)
+
+        with open(join_times_path, join_file_mode) as f:
+            if should_write_header:
+                f.write(join_times_header)
+
+            if parallelize:
+                with mp.Pool(processes=n_processes) as pool:
+                    for result in pool.imap_unordered(_compute_join_time_worker, tasks, chunksize=chunk_size):
+                        completed += 1
+                        if completed % max(1, total // 200) == 0 or completed == total:
+                            pct = 100.0 * completed / total
+                            print(f"\rProgress: {completed}/{total} ({pct:.1f}%)", end='', flush=True)
+
+                        sat_id, gg_id, num_members, cluster_mass, join_time_info = result
+                        if join_time_info is None:
+                            newly_missing_tree.append(sat_id)
+                            continue
+                        f.write(
+                            f"{gg_id}\t{sat_id}\t{num_members}\t{cluster_mass}\t"
+                            + "\t".join(str(x) for x in join_time_info)
+                            + "\n"
+                        )
+                        processedJoinTimes.append(join_time_info[0])
+            else:
+                for task in tasks:
+                    sat_id, gg_id, num_members, cluster_mass, join_time_info = _compute_join_time_worker(task)
+                    completed += 1
+                    if completed % max(1, total // 200) == 0 or completed == total:
+                        pct = 100.0 * completed / total
+                        print(f"\rProgress: {completed}/{total} ({pct:.1f}%)", end='', flush=True)
+
+                    if join_time_info is None:
+                        newly_missing_tree.append(sat_id)
+                        continue
+                    f.write(
+                        f"{gg_id}\t{sat_id}\t{num_members}\t{cluster_mass}\t"
+                        + "\t".join(str(x) for x in join_time_info)
+                        + "\n"
+                    )
+                    processedJoinTimes.append(join_time_info[0])
+
+        print()  # newline after progress
+
+        # Update satellites-without-tree file in one batch (much faster)
+        if newly_missing_tree:
+            with open(satellites_without_tree_path, 'a') as g:
+                for sid in newly_missing_tree:
+                    g.write(f"{sid}\n")
+            satellitesWihtoutMergerTree.update(newly_missing_tree)
+
+        print(
+            f"Finished processing {total} satellites. "
+            f"Newly missing merger tree: {len(newly_missing_tree)}. "
+            f"Total missing-tree cache size: {len(satellitesWihtoutMergerTree)}. "
+            f"Finite join redshifts: {int(np.sum(np.isfinite(processedJoinTimes)))}/{len(processedJoinTimes)}"
+        )
+
+
+
+def _compute_join_time_worker(args: tuple):
+    """Worker to compute a single satellite join-time record.
+
+    Returns:
+        (sat_id, gg_id, num_members, cluster_mass, join_time_info_or_None)
+
+    Note: JoinTime object is instantiated inside the worker for pickling safety.
+    """
+    sim, snapshot, host_id, sat_id, L, halfbox, fname, gg_id, num_members, cluster_mass = args
+    joinTime = JoinTime(sim, snapshot)
+    join_time_info = joinTime.computeJoinTimes(hostID=host_id, ID=sat_id, L=L, halfbox=halfbox, fname=fname)
+    if join_time_info is None:
+        return sat_id, gg_id, num_members, cluster_mass, None
+    try:
+        join_time_list = list(join_time_info)
+    except Exception:
+        join_time_list = [join_time_info]
+    return sat_id, gg_id, num_members, cluster_mass, join_time_list
