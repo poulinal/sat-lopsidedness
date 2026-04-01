@@ -85,6 +85,12 @@ class ListGalaxyGroup:
     def getGalaxyGroupI(self, i) -> GalaxyGroup:
         return self.listGalaxyGroups[i]
 
+    def getGalaxyGroupByID(self, group_id : int) -> GalaxyGroup | None:
+        for galaxyGroup in self.listGalaxyGroups:
+            if galaxyGroup.group_id == group_id:
+                return galaxyGroup
+        return None
+
     def getSubhaloByID(self, subhalo_id : int) -> Subhalo | None:
         for galaxyGroup in self.listGalaxyGroups:
             subhalo = galaxyGroup.getSubhaloByID(subhalo_id)

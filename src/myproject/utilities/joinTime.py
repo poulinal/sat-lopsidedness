@@ -3,6 +3,7 @@ import os
 import h5py as h5
 import numpy as np
 from requests.exceptions import HTTPError
+import illustris_python as il
 
 class JoinTime():
     def __init__(self, sim, snapshot):
@@ -33,6 +34,8 @@ class JoinTime():
         fName = 'Trees/sublink_mpb_'+str(subid) if fname == '' else fname
         if os.path.exists(fName+'.hdf5'):
             return(fName+'.hdf5')
+        else:
+            print(f"file does not exist: {fName}.hdf5")
         url=f'https://www.tng-project.org/api/{self.sim}/snapshots/{self.snapshot}/subhalos/'+str(subid)+'/sublink/mpb.hdf5'
         tree=get(url,fName=fName)
         return(tree)
@@ -45,6 +48,29 @@ class JoinTime():
         """
         Use the satellite and host trees to find the joining redshift of a satellite based on when it first approached its z=0 FoF group within 3R200
         Identify the change in satellite parameters since they joined
+
+        Returns:        
+        joinred: redshift at which the satellite joined its current host halo
+        sep_z0: separation between satellite and host at z=0 in kpc
+        sep_norm: separation at z=0 normalized by the host's R200
+        del_M: change in satellite gas mass since joining in Msun
+        del_T_all: change in satellite kinetic energy since joining, using all mass in Msun*(km/s)^2
+        del_T_lim: change in satellite kinetic energy since joining, using only gas+star mass in Msun*(km/s)^2
+        del_M_total: change in satellite total mass since joining in Msun
+        del_M_dm: change in satellite dark matter mass since joining in Msun
+        del_M_stars: change in satellite stellar mass since joining in Msun
+        del_vsq: change in satellite relative velocity squared since joining in (km/s)^2
+        joinsnap: snapshot number at which the satellite joined its current host halo
+        closest: closest approach between satellite and host in kpc
+        closest_norm: closest approach normalized by host R200
+        closest_z: redshift at which the closest approach occurred
+        joinprog: ID of the progenitor galaxy of the subhalo at the joining snapshot, used to pull progenitor cutout in other code
+        del_L: change in satellite angular momentum since joining in Msun*kpc*km/s
+        s_mass_j: satellite stellar mass at joining in Msun
+        hostprog_ID: ID of the progenitor galaxy of the host halo at the joining snapshot, used to pull progenitor cutout in other code
+        L_join: satellite angular momentum at joining in Msun*kpc*km/s
+        L_0: satellite angular momentum at z=0 in Msun*kpc*km/s
+        first1R200
         """
 
 

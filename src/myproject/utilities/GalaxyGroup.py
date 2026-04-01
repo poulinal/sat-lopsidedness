@@ -96,6 +96,13 @@ class GalaxyGroup:
     
     def getSubhaloI(self, i):
         return self.listSubhalos[i]
+
+    def getSubhaloByID(self, subhalo_id : int) -> Subhalo | None:
+        for subhalo in self.listSubhalos:
+            if subhalo.getIdx() == subhalo_id:
+                return subhalo
+        # print("Couldnt find subhalo idx")
+        return None
     
     def setCentralSubhalo(self, central_subhalo : Subhalo):
         self.centralSubhalo = central_subhalo

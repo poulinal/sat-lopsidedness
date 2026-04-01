@@ -90,9 +90,26 @@ class Subhalo:
     def getDistanceToGroupCenter(self):
         return self.distanceToGroupCenter
     
-    def getJoiningRedshift(self):
-        return self.joiningRedshift[0] if self.joiningRedshift is not np.nan else np.nan
-    
+    def getJoiningRedshift(self, numR200:int=3):
+        # print(self.joiningRedshift, np.isnan(self.joiningRedshift))
+        if isinstance(self.joiningRedshift, float) and np.isnan(self.joiningRedshift):
+            return np.nan
+        else:
+            # print(self.joiningRedshift)
+            if numR200 == 3:
+                return self.joiningRedshift[0]
+            elif numR200 == 2:
+                return self.joiningRedshift[21]
+            elif numR200 == 1:
+                return self.joiningRedshift[20]
+
+    def getJoiningRedshift1R200(self):
+        if isinstance(self.joiningRedshift, float) and np.isnan(self.joiningRedshift):
+            return np.nan
+        else:
+            # print(self.joiningRedshift)
+            return self.joiningRedshift[20]
+
     def getJoiningRedshiftInfo(self):
         return self.joiningRedshift
     

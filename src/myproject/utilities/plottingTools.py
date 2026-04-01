@@ -283,7 +283,7 @@ class AstroPlotter:
                 cbar.set_label(clabel)
         
         if include_legend and label:
-            ax.legend(loc='upper right')
+            ax.legend(loc='upper right', fontsize=8)
         
         if output_filename:
             self.save_figure(fig, output_filename)
