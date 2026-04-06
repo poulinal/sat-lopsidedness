@@ -74,14 +74,17 @@ class GalaxyGroupData:
         self.groupCM = None
         self.groupPos = None
         self.maxValidGroupIndex = None
+        self.primary_zoom_target = None
+        self.primary_group_indexes = None  # Stored as a set[int] for fast membership checks
         
         self.list_of_galaxy_groups = None
         self.filtered_and_corrected_list_of_galaxy_groups = None
+
         
     def computeAllData(self, additionalFileIdentifier:str=''):
         for sim in [self.sim]:
             for i, snapshot in enumerate(self.snapshot_dic.keys()): #possible_snapshots:
-                if snapshot == 99:
+                if snapshot > 99:
                     print(f"previously got all data for {snapshot}")
                     continue
                 # if snapshot > 60:
@@ -116,41 +119,61 @@ class GalaxyGroupData:
         
         list_of_galaxy_groups : ListGalaxyGroup = ListGalaxyGroup(headerInformation = headerInformation, listGalaxyGroups=[])
 
-        temp_dict_galaxy_groups : dict[int, GalaxyGroup] = {} #temporary dictionary to hold galaxy groups while we build them since lookup is faster
+        # Collect subhalos per group first, then build GalaxyGroup once per group.
+        temp_group_subhalos: dict[int, list[Subhalo]] = {}
 
         print(f"num subhalos: {self.subhaloGroupNum.shape[0]}")
         print(f"rough number of galaxygroups: {len(np.unique(self.subhaloGroupNum))}")
-        for i in range(self.subhaloGroupNum.shape[0]):
+
+        iter_indices = self.primary_subhalo_indexes if self.primary_subhalo_indexes is not None else np.arange(self.subhaloGroupNum.shape[0])
+        iter_total = len(iter_indices)
+        progress_step = max(1, iter_total // 500) if iter_total > 0 else 1
+        for iter_i, i in enumerate(iter_indices, start=1):
+            if (iter_i % progress_step == 0) or (iter_i == iter_total):
+                pct = 100.0 * iter_i / iter_total
+                print(f"Processing primary subhalos: {iter_i}/{iter_total} ({pct:.1f}%)", end='\r', flush=True)
             if self.flag[i] == False: #remove
                 continue
             if np.isnan(self.SubhaloStellarPhotometrics[i][5]):
                 continue
-            group_num = self.subhaloGroupNum[i]
+            group_num = int(self.subhaloGroupNum[i])
             
-            if group_num > self.maxValidGroupIndex: ##NOTE assuming group numbers are sequential and start from 0
+            if group_num > self.maxValidGroupIndex: ##NOTE assuming group numbers are sequential and 
                 break
             # if group_num not in temp_dic_validGroupMassIndexes:
             #     print(f"Skipping group number {group_num} as it does not meet mass criteria.")
             #     continue
             
-            if group_num not in temp_dict_galaxy_groups: #check if galaxy group already exists - if not, create it - else just add the subhalo to it
-                #initialize new empty galaxy group
+            if self.primary_group_indexes is not None and group_num not in self.primary_group_indexes:
+                continue
+            
+            if group_num not in temp_group_subhalos:
                 if self.groupMCrit200[group_num] < 1e13:
                     continue
-                galaxyGroup = None
-                galaxyGroup = GalaxyGroup(group_id=group_num, RCrit200=self.groupRCrit200[group_num], posCM=self.groupCM[group_num],  MCrit200=self.groupMCrit200[group_num], pos=self.groupPos[group_num], listSubhalos=[])
-                # print(galaxyGroup.getNumSubhalos())
-                temp_dict_galaxy_groups[group_num] = galaxyGroup
-                
-                list_of_galaxy_groups.addGalaxyGroup(galaxyGroup) #add to the master list
-            # print(galaxyGroup.getNumSubhalos())
+                temp_group_subhalos[group_num] = []
                 
             # print(f"premass : {mass[i]}")
             subhalo = Subhalo(i, group_id=group_num, flag=self.flag[i], mass=self.mass[i], stellarMass=self.stellar_mass[i], groupNumber=self.subhaloGroupNum[i], position=self.subhaloPos[i], halfMassRad=self.subhaloHalfmassRad[i], vmaxRadius=self.SubhaloVmaxRad[i], luminosities=self.SubhaloStellarPhotometrics[i], luminositiesSDSS = self.SubhaloSDSSStellarPhotometrics[i], group_pos=self.groupPos[group_num]) #create subhalo    
             
-            temp_dict_galaxy_groups[group_num].addSubhalo(subhalo) #add subhalo to the appropriate galaxy group
+            temp_group_subhalos[group_num].append(subhalo)
+
+        if iter_total > 0:
+            print()
+
+        # Build each GalaxyGroup once so central/satellite partitioning is computed once.
+        for group_num, subhalos in temp_group_subhalos.items():
+            galaxyGroup = GalaxyGroup(
+                group_id=group_num,
+                RCrit200=self.groupRCrit200[group_num],
+                posCM=self.groupCM[group_num],
+                MCrit200=self.groupMCrit200[group_num],
+                pos=self.groupPos[group_num],
+                listSubhalos=subhalos,
+            )
+            list_of_galaxy_groups.addGalaxyGroup(galaxyGroup)
 
         print(f'Constructed ListGalaxyGroup with {list_of_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
+        # print(f"list of ids: {[gg.getGroupID() for gg in list_of_galaxy_groups.getAllGalaxyGroups()]}")
         print(f' Average satellites: {list_of_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         self.list_of_galaxy_groups = list_of_galaxy_groups
     
@@ -170,7 +193,7 @@ class GalaxyGroupData:
         output_filename = self.scratchDataDirc + f'/galaxy_data_{self.sim}_{additionalFileIdentifier}.hdf5'
         with h5.File(output_filename, 'w') as f:
             # list_of_galaxy_groups.save_to_hdf5(f)
-            self.filtered_and_corrected_list_galaxy_groups.save_to_hdf5(f, parallize=True)
+            self.filtered_and_corrected_list_galaxy_groups.save_to_hdf5(f, parallize=True, storage_layout='datasets')
         print(f'Saved galaxy data to {output_filename}')
         
         num_mostMassiveNotCentral=0
@@ -278,7 +301,8 @@ class GalaxyGroupData:
             print(f'created directory: {self.scratchDataDirc} "catalogs/SubhaloStellarPhotometrics"')
 
         if sim == 'TNG-Cluster':
-            return np.zeros(len(self.SubhaloStellarPhotometrics))
+            # Keep SDSS shape consistent with non-cluster runs: 8-band vector per subhalo.
+            return np.full((len(self.SubhaloStellarPhotometrics), 8), np.nan, dtype=np.float64)
 
         rewriteFile=0
         fileName=self.scratchDataDirc+'catalogs/SubhaloStellarPhotometrics/SubhaloSDSSStellarPhotometrics'
@@ -309,8 +333,22 @@ class GalaxyGroupData:
         self.groupRCrit200 = self.getGroupRCrit200Data(sim, snapshot)
         self.groupCM = self.getGroupCMData(sim, snapshot)
         self.groupPos = self.getGroupPosData(sim, snapshot)
+        self.primary_zoom_target, self.primary_group_indexes = self.filterToPrimaryGalaxyGroups() if sim == 'TNG-Cluster' else (None, None)
+        if sim == 'TNG-Cluster' and self.primary_zoom_target is not None and self.subhaloGroupNum is not None:
+            # Build a fast per-subhalo mask/index array aligned with subhaloGroupNum.
+            subhalo_groups = self.subhaloGroupNum.astype(np.int64, copy=False)
+            valid_group_idx = (subhalo_groups >= 0) & (subhalo_groups < len(self.primary_zoom_target))
+            self.primary_subhalo_mask = np.zeros(subhalo_groups.shape[0], dtype=bool)
+            self.primary_subhalo_mask[valid_group_idx] = self.primary_zoom_target[subhalo_groups[valid_group_idx]] > 0
+            self.primary_subhalo_indexes = np.where(self.primary_subhalo_mask)[0]
+            print(f"len primary subhalo indexes: {len(self.primary_subhalo_indexes)}")
+        else:
+            self.primary_subhalo_mask = None
+            self.primary_subhalo_indexes = None
+        print(f"len primary group indexes: {len(self.primary_group_indexes) if self.primary_group_indexes is not None else 0}")
         
-        return self.groupMCrit200, self.groupRCrit200, self.groupCM, self.groupPos
+        
+        return self.groupMCrit200, self.groupRCrit200, self.groupCM, self.groupPos, self.primary_zoom_target, self.primary_group_indexes
     
     def getGroupMCrit200Data(self, sim, snapshot):
         if not os.path.exists(self.scratchDataDirc + 'catalogs/GroupMCrit200'):
@@ -371,32 +409,21 @@ class GalaxyGroupData:
         return groupPos
     
     def filterToPrimaryGalaxyGroups(self):
-        # Read the TNG-Cluster primary info table and keep only the primary haloID values.
-        primary_info_path = Path(__file__).resolve().parent / 'tng-cluster-primaryinfo.txt'
-        primary_ids: set[int] = set()
-
-        with open(primary_info_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-
-                parts = line.split()
-                if len(parts) < 2:
-                    continue
-
-                try:
-                    halo_id = int(parts[1])
-                except ValueError:
-                    continue
-
-                primary_ids.add(halo_id)
-
-        print(f"Loaded {len(primary_ids)} primary galaxy group IDs from {primary_info_path}")
-
-        filtered_groups = [gg for gg in self.list_of_galaxy_groups.getAllGalaxyGroups() if gg.getGroupID() in primary_ids]
-        self.list_of_galaxy_groups.setGalaxyGroups(filtered_groups)
-        print(f"After filtering to primary groups, ListGalaxyGroup has {self.list_of_galaxy_groups.getNumGalaxyGroups()} galaxy groups.")
+        # get only primaries by reading the group field: GroupPrimaryZoomTarget
+        if not os.path.exists(self.scratchDataDirc + 'catalogs/GroupPrimaryZoomTarget'):
+            os.makedirs(self.scratchDataDirc + 'catalogs/GroupPrimaryZoomTarget')
+            print(f'created directory: {self.scratchDataDirc} "catalogs/GroupPrimaryZoomTarget"')
+        primary_zoom_target = iapi_TNG.getHaloField('GroupPrimaryZoomTarget',simulation = self.sim,fileName=self.scratchDataDirc+'catalogs/GroupPrimaryZoomTarget/GroupPrimaryZoomTarget',snapshot=self.snapshot,rewriteFile=0)
+        primary_group_indexes = set(int(idx) for idx in np.where(primary_zoom_target > 0)[0])
+        print(f"Number of primary galaxy groups: {len(primary_group_indexes)}, len primary_zoom_target {len(primary_zoom_target)}, len subhaloGroupNum {len(self.subhaloGroupNum)}, max subhaloGroupNum {max(self.subhaloGroupNum)}, max primary index: {max(np.where(primary_zoom_target > 0)[0])}")#, full index list: {np.where(primary_zoom_target > 0)[0]}")
+        return primary_zoom_target, primary_group_indexes
+        # filtered_list_galaxy_groups = ListGalaxyGroup(headerInformation=self.list_of_galaxy_groups.headerInformation, listGalaxyGroups=[])
+        # for gg in self.list_of_galaxy_groups.getAllGalaxyGroups():
+        #     if gg.getGroupID() in primary_group_indexes:
+        #         filtered_list_galaxy_groups.addGalaxyGroup(gg)
+        # print(f'After filtering to primary galaxy groups, ListGalaxyGroup has {filtered_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
+        # print(f' Average satellites: {filtered_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
+        # self.list_of_galaxy_groups.setGalaxyGroups(filtered_list_galaxy_groups)
     
     def updateSubhalosWithJoinTimes(self):
         for gg in self.filtered_and_corrected_list_galaxy_groups.getAllGalaxyGroups():

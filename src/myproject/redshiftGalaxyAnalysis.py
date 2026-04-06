@@ -47,7 +47,7 @@ class GalaxyAnalysis:
         self.MRLDistributionPlots(self.scratchPlotDirc)
 
         print("Finished normal")
-        self.HighMRLPlots(self.scratchPlotDirc)
+        # self.HighMRLPlots(self.scratchPlotDirc)
         # self.plot_satellite_number_distribution_for_all_mass_bins(self.scratchPlotDirc)
         self.plot_M200_distribution_for_all_mass_bins(self.scratchPlotDirc)
 
@@ -794,7 +794,7 @@ class GalaxyAnalysis:
                 median_num = len(galaxy_group.getSatelliteSubhalos())
                 median_num_subhalos.append(median_num)
             mass_bin_labels.append(mass_bin_label)
-            print(f"Mass bin: {mass_bin_label}, median number of subhalos: {median_num}")
+            # print(f"Mass bin: {mass_bin_label}, median number of subhalos: {median_num}")
         
             median_subhalo_plotter.histogram(
                 median_num_subhalos,
@@ -914,7 +914,7 @@ class GalaxyAnalysis:
     def getPercentOfClustersAboveRandomMRLCL(self, listGG : ListGalaxyGroup, percentageMRL:float = 0.99*100, random_mrl_values:list[list[float]] = None) -> float:
         MRL_values = listGG.compute_probablity_distribution_of_MRL_directionality(parallelize=False) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
         if random_mrl_values is None:
-            random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=10000) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
+            random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=1000) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
         else:
             random_MRL_values = random_mrl_values
         fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)

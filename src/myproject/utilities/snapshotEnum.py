@@ -16,7 +16,16 @@ class SnapshotEnum(Enum):
     SNAPSHOT_25 = (25, 3.0, 'z3p0')
     
     def getAllSnapshots():
-        return [snapshot.value for snapshot in SnapshotEnum]
+        """Return a list of snapshot tuples sorted by redshift (ascending).
+
+        Each item is the tuple stored in the enum value, e.g. (99, 0.0, 'z0p0').
+        Sorting ensures plotting and iteration proceed from low to high redshift.
+        """
+        return sorted([snapshot.value for snapshot in SnapshotEnum], key=lambda v: v[1])
+    
+    def getAllRedshifts():
+        """Return a list of redshift values sorted in ascending order."""
+        return sorted([snapshot.value[1] for snapshot in SnapshotEnum])
     
         
     

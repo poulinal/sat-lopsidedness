@@ -398,7 +398,7 @@ class ListGalaxyGroup:
             for gg in self.listGalaxyGroups
         ]
         total = len(args_list)
-        print(f"total to process: {total}")
+        # print(f"total to process: {total}")
         
         if parallelize:
             if n_processes is None:
@@ -484,8 +484,7 @@ class ListGalaxyGroup:
         n_processes: Optional[int] = None,
         storage_layout: str = 'attrs',
         compression: Optional[str] = None,
-        compression_opts: Optional[int] = None,
-    ):
+        compression_opts: Optional[int] = None,):
         '''
         Parallel version of save_to_hdf5 using multiprocessing.
         Serializes galaxy group data in parallel, then writes sequentially.

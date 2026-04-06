@@ -154,7 +154,7 @@ def getredshift(snapnum, simname):
 
 
 def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
-                    fileName='tempCat', rewriteFile=0, saveFile:bool=False):
+                    fileName='tempCat', rewriteFile=0, saveFile:bool=True):
     """
     Credit to TNG team
     Data from one field for all subhalos in a given snapshot      
@@ -253,19 +253,32 @@ def getSubhaloField(field, simulation='TNG100-1', snapshot=99,
                 print(f"retrieved field")
 
                 if saveFile:
-                    savepath = fileName
+                    savepath = dataFile
                     save_field(data, field, savepath)
+                    # print(f"saved {field} to {savepath}")
                 return data
    
     with h5py.File(dataFile,'r') as f:
-                data=np.array(f['Subhalo'][field])
+        # Support both native TNG groupcat layout (/Subhalo/<field>) and
+        # locally saved single-field layout (/<field>) from save_field().
+        if 'Subhalo' in f and field in f['Subhalo']:
+            data = np.array(f['Subhalo'][field])
+        elif field in f:
+            data = np.array(f[field])
+        else:
+            available_top = list(f.keys())
+            available_sub = list(f['Subhalo'].keys()) if 'Subhalo' in f else []
+            raise KeyError(
+                f"Field '{field}' not found in {dataFile}. "
+                f"Top-level keys={available_top}, Subhalo keys={available_sub[:20]}"
+            )
         
 
     return data
     
   
 def getHaloField(field, simulation='TNG100-1', snapshot=99,
-                 fileName='tempCat', rewriteFile=0, saveFile:bool=False):
+                 fileName='tempCat', rewriteFile=0, saveFile:bool=True):
     """
     Credit to TNG team
     Data from one field for all halos/subhalos in a given snapshot      
@@ -359,13 +372,26 @@ def getHaloField(field, simulation='TNG100-1', snapshot=99,
                 print(f"retrieved field")
 
                 if saveFile:
-                    savepath = fileName
+                    savepath = dataFile
                     save_field(data, field, savepath)
+                    # print(f"saved {field} to {savepath}")
                 return data
 
         
     with h5py.File(dataFile,'r') as f:
-        data=np.array(f['Group'][field])
+        # Support both native TNG groupcat layout (/Group/<field>) and
+        # locally saved single-field layout (/<field>) from save_field().
+        if 'Group' in f and field in f['Group']:
+            data = np.array(f['Group'][field])
+        elif field in f:
+            data = np.array(f[field])
+        else:
+            available_top = list(f.keys())
+            available_group = list(f['Group'].keys()) if 'Group' in f else []
+            raise KeyError(
+                f"Field '{field}' not found in {dataFile}. "
+                f"Top-level keys={available_top}, Group keys={available_group[:20]}"
+            )
 
     return data
 
