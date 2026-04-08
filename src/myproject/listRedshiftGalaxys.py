@@ -24,8 +24,8 @@ class ListRedshiftGalaxy:
     def initializeAllGalaxyAnalysis(self, snapshot_enums : list, simulation:str, luminosityType:str, generalErrorbar:str = 'poisson', generalRewrite:bool = True):
         if luminosityType not in ['SDSS', 'Default']:
             raise ValueError("Invalid luminosity type. Must be 'SDSS' or 'Default'.")
-        if simulation not in ['TNG300-1', 'TNG-Cluster']:
-            raise ValueError("Invalid simulation. Must be 'TNG300-1' or 'TNG-Cluster'.")
+        if simulation not in ['TNG300-1', 'TNG-Cluster', 'TNG300-1, TNG-Cluster', 'TNG-Cluster, TNG300-1']:
+            raise ValueError("Invalid simulation. Must be 'TNG300-1' or 'TNG-Cluster' or 'TNG300-1, TNG-Cluster' or 'TNG-Cluster, TNG300-1'.")
         for snapshot_enum in snapshot_enums:
             galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType)
             self.addGalaxyAnalysis(snapshot_enum, galaxy_analysis)

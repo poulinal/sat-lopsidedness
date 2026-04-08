@@ -71,6 +71,10 @@ class ListGalaxyGroup:
     def addGalaxyGroup(self, galaxyGroup : GalaxyGroup):
         self.listGalaxyGroups.append(galaxyGroup)
         self.lenGalaxyGroups += 1
+    
+    def addGalaxyGroups(self, galaxyGroups : list[GalaxyGroup]):
+        self.listGalaxyGroups.extend(galaxyGroups)
+        self.lenGalaxyGroups += len(galaxyGroups)
         
     def setGalaxyGroups(self, listGalaxyGroups : list[GalaxyGroup]):
         self.listGalaxyGroups = listGalaxyGroups

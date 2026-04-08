@@ -33,7 +33,6 @@ class GalaxyAnalysis:
         self.generalErrorbar = generalErrorbar
         
         self.load_galaxy_groups(luminosityType) if loaded_list_of_galaxy_groupsRaw is None else self.load_galaxy_groups(luminosityType, loaded_list_of_galaxy_groupsRaw)
-        self.initializeMassSubgroups()
 
         
     def computeAllPlots(self):
@@ -55,26 +54,41 @@ class GalaxyAnalysis:
         self.plot_joining_redshift_for_all_mass_bins(self.scratchPlotDirc)
     
     def setDircs(self):
-        self.scratchDataDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/data'
-        
-        self.scratchPlotDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/plots'
+        if self.sim == 'TNG300-1, TNG-Cluster' or self.sim == 'TNG-Cluster, TNG300-1':
+            self.scratchDataDirc = f'/scratch/poulin.al/lopsided/TNG300-1/{self.snapshot_dic[self.snapshot][1]}/data'
+            self.scratchPlotDirc = f'/scratch/poulin.al/lopsided/TNG300-1/{self.snapshot_dic[self.snapshot][1]}/plots/combinedTNG300-1_TNGCluster'
+            self.scratchDataDirc_cluster = f'/scratch/poulin.al/lopsided/TNG-Cluster/{self.snapshot_dic[self.snapshot][1]}/data'
+        else:
+            self.scratchDataDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/data'
+            
+            self.scratchPlotDirc = f'/scratch/poulin.al/lopsided/{self.sim}/{self.snapshot_dic[self.snapshot][1]}/plots'
         self.localDataDirc = f'/Users/alexpoulin/Library/CloudStorage/OneDrive-NortheasternUniversity/TGB–Data'
 
     def load_galaxy_groups(self, luminosityType:str='SDSS', preloaded_list_of_galaxy_groupsRaw: ListGalaxyGroup = None):
-        data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}_.hdf5'
+        if self.sim == 'TNG300-1, TNG-Cluster' or self.sim == 'TNG-Cluster, TNG300-1':
+            data_file = self.scratchDataDirc + f'/galaxy_data_TNG300-1_.hdf5'
+            data_file_cluster = self.scratchDataDirc_cluster + f'/galaxy_data_TNG-Cluster_.hdf5'
+        else:
+            data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}_.hdf5'
         # data_file = self.scratchDataDirc + f'/galaxy_data_{self.sim}.hdf5' #original
         # data_file = localDataDirc + f'/galaxy_data_{sim}.hdf5'
         if preloaded_list_of_galaxy_groupsRaw is None:
             with h5.File(data_file, 'r') as f:
                 self.loaded_list_of_galaxy_groupsRaw = ListGalaxyGroup.from_hdf5(f)
+            if self.sim == 'TNG300-1, TNG-Cluster' or self.sim == 'TNG-Cluster, TNG300-1':
+                with h5.File(data_file_cluster, 'r') as f:
+                    self.loaded_list_of_galaxy_groupsRaw_cluster = ListGalaxyGroup.from_hdf5(f)
             print(f'Loaded galaxy data from {data_file}')
         else:
             print("Using preloaded input for galaxy data")
             self.loaded_list_of_galaxy_groupsRaw = preloaded_list_of_galaxy_groupsRaw
+            
+        self.loaded_list_of_galaxy_groupsRaw.addGalaxyGroups(self.loaded_list_of_galaxy_groupsRaw_cluster.getAllGalaxyGroups()) if self.sim == 'TNG300-1, TNG-Cluster' or self.sim == 'TNG-Cluster, TNG300-1' else None
         
         self.loaded_list_of_galaxy_groups = self.loaded_list_of_galaxy_groupsRaw.getFilterSubhalos(minGGMass=1e13, M_r_max=-15) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groupsRaw.getFilterSubhalos(minGGMass=1e13, M_default_r_max=-15)
 
         self.filtered_gt14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14) if luminosityType=='SDSS' else self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e14)
+        self.initializeMassSubgroups()
 
         return self.loaded_list_of_galaxy_groups
     
@@ -98,22 +112,22 @@ class GalaxyAnalysis:
         self.plotIdentifier = f'{newsim}_{self.snapshot_dic[newsnapshot][1]}'
         self.setDircs()
         self.load_galaxy_groups(luminosityType)
-        self.initializeMassSubgroups()
+        # self.initializeMassSubgroups()
 
     def initializeMassSubgroups(self, list_of_galaxy_groups : ListGalaxyGroup = None):
         if list_of_galaxy_groups is not None:
             self.loaded_list_of_galaxy_groups = list_of_galaxy_groups
         #filter to groups with stellar mass 10^{13} < $M_{{200}}$ < 10^{13.5} Msun
-        self.filtered_gt13_ls13p5_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=5e13, minGGMass=1e13)
+        self.filtered_gt13_ls13p5_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=10**13.5, minGGMass=1e13)
 
         #filter to groups with stellar mass 10^{13.5} < $M_{{200}}$ < 10^{14} Msun
-        self.filtered_gt13p5_ls14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=1e14, minGGMass=5e13)
+        self.filtered_gt13p5_ls14_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=1e14, minGGMass=10**13.5)
 
         #filter to groups with stellar mass 10^{14} < $M_{{200}}$ < 10^{14.5} Msun
-        self.filtered_gt14_ls14p5_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=5e14, minGGMass=1e14)
+        self.filtered_gt14_ls14p5_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=10**14.5, minGGMass=1e14)
 
         #filter to groups with stellar mass 10^{14.5} < $M_{{200}}$ < 10^{15} Msun
-        self.filtered_gt14p5_ls15_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=1e15, minGGMass=5e14)
+        self.filtered_gt14p5_ls15_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(maxGGMass=1e15, minGGMass=10**14.5)
 
         #filter to groups with stellar mass $M_{{200}}$ > 10^{15} Msun
         self.filtered_gt15_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e15)
