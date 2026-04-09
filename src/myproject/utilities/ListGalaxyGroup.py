@@ -1005,7 +1005,7 @@ class ListGalaxyGroup:
         deg = 180.0 / np.pi
         
         for i in range(num_subhalos):
-            print(f"\rProcessing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}", end='', flush=True)
+            # print(f"\rProcessing Subhalo {i+1}/{num_subhalos} in Galaxy Group ID {galaxyGroup.getGroupID()} with total pairs {num_subhalos * (num_subhalos - 1) // 2}", end='', flush=True)
             for j in range(i + 1, num_subhalos):
                 # Compute angle differences for each plane (in radians, then convert)
                 # where delta_xy=0 corresponds to the same side and delta_xy=180 corresponds to opposite sides
