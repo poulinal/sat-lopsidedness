@@ -1,5 +1,5 @@
 #AP 2026
-
+from __future__ import annotations
 from myproject import GalaxyGroup, Subhalo, ListGalaxyGroup, AstroPlotter
 from myproject.utilities.joinTime import JoinTime
 import matplotlib.pyplot as plt
@@ -139,7 +139,7 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences = list_of_galaxy_group.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_{self.plotIdentifier}', rewrite=self.generalRewrite)
         
         # polar_bin_centers, pairwise_polar_differences = list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False, tempSaveDir=localDataDirc)
-        pairwise_polar_differences_binned, polar_bin_centers, pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_binned, polar_bin_centers, pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         print('Computed pairwise polar differences between satellite galaxies.') if self.verbose else None
                 
         prob_polar_plotter = AstroPlotter()
@@ -314,8 +314,8 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences_red = filtered_red_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_red_{self.plotIdentifier}', rewrite=self.generalRewrite)
         list_pairwise_polar_differences_blue = filtered_blue_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_color/pairwise_polar_blue_{self.plotIdentifier}', rewrite=self.generalRewrite)
         
-        pairwise_polar_differences_red, polar_bin_centers_red, pairwise_polar_red_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_red, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-        pairwise_polar_differences_blue, polar_bin_centers_blue, pairwise_polar_blue_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_blue, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_red, polar_bin_centers_red, pairwise_polar_red_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_red, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
+        pairwise_polar_differences_blue, polar_bin_centers_blue, pairwise_polar_blue_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_blue, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
 
         print('Computed pairwise polar differences between red and blue satellite galaxies.')
         prob_polar_red_blue_plotter = AstroPlotter()
@@ -380,8 +380,8 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences_LT50 = filtered_LT50_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_memberNum/pairwise_polar_LT50_{self.plotIdentifier}', rewrite=self.generalRewrite)
         
         print('Computed pairwise polar differences for galaxy groups with >150 and <50 satellites.')
-        pairwise_polar_differences_GT150, polar_bin_centers_GT150, pairwise_polar_GT150_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_GT150, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-        pairwise_polar_differences_LT50, polar_bin_centers_LT50, pairwise_polar_LT50_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_LT50, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_GT150, polar_bin_centers_GT150, pairwise_polar_GT150_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_GT150, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
+        pairwise_polar_differences_LT50, polar_bin_centers_LT50, pairwise_polar_LT50_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_LT50, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         
         prob_polar_GT150_LT50_plotter = AstroPlotter()
         prob_polar_GT150_LT50_fig, prob_polar_GT150_LT50_ax = prob_polar_GT150_LT50_plotter.create_figure()
@@ -437,8 +437,8 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences_LT35R200 = filtered_LT35R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_radius/pairwise_polar_LT35R200_{self.plotIdentifier}', rewrite=self.generalRewrite)
         list_pairwise_polar_differences_GT65R200 = filtered_GT65R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_radius/pairwise_polar_GT65R200_{self.plotIdentifier}', rewrite=self.generalRewrite)
         
-        pairwise_polar_differences_LT35R200, polar_bin_centers_LT35R200, pairwise_polar_LT35R200_errorbars = filtered_LT35R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_LT35R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-        pairwise_polar_differences_GT65R200, polar_bin_centers_GT65R200, pairwise_polar_GT65R200_errorbars = filtered_GT65R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_GT65R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_LT35R200, polar_bin_centers_LT35R200, pairwise_polar_LT35R200_errorbars = filtered_LT35R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_LT35R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
+        pairwise_polar_differences_GT65R200, polar_bin_centers_GT65R200, pairwise_polar_GT65R200_errorbars = filtered_GT65R200_list_of_galaxy_groups.get_histogram_bins(list_pairwise_polar_differences_GT65R200, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         
         prob_polar_LT35R200_GT65R200_plotter = AstroPlotter()
         prob_polar_LT35R200_GT65R200_fig, prob_polar_LT35R200_GT65R200_ax = prob_polar_LT35R200_GT65R200_plotter.create_figure()
@@ -568,9 +568,9 @@ class GalaxyAnalysis:
         list_pairwise_polar_differences_13_14 = filtered_gt13_ls14_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
         list_pairwise_polar_differences_gt14 = self.filtered_gt14_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)
         
-        pairwise_polar_differences_13_14, polar_bin_centers_13_14, pairwise_polar_13_14_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_13_14, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_13_14, polar_bin_centers_13_14, pairwise_polar_13_14_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_13_14, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         
-        pairwise_polar_differences_gt14, polar_bin_centers_gt14, pairwise_polar_gt14_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_gt14, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+        pairwise_polar_differences_gt14, polar_bin_centers_gt14, pairwise_polar_gt14_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_gt14, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         
         prob_polar_gt14_lt14_plotter = AstroPlotter()
         prob_polar_gt14_lt14_fig, prob_polar_gt14_lt14_ax = prob_polar_gt14_lt14_plotter.create_figure()
@@ -846,8 +846,8 @@ class GalaxyAnalysis:
             list_pairwise_polar_differences_total = mass_filtered_list.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/pairwise_polar_{mass_bin_label}_{self.plotIdentifier}', rewrite=self.generalRewrite)
             
             pairwise_polar_differences_centralMassive, polar_bin_centers_centralMassive, pairwise_polar_centralMassive_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_centralMassive, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-            pairwise_polar_differences_notCentralMassive, polar_bin_centers_notCentralMassive, pairwise_polar_notCentralMassive_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_notCentralMassive, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
-            pairwise_polar_differences_total, polar_bin_centers_total, pairwise_polar_total_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_total, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar)
+            pairwise_polar_differences_notCentralMassive, polar_bin_centers_notCentralMassive, pairwise_polar_notCentralMassive_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_notCentralMassive, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
+            pairwise_polar_differences_total, polar_bin_centers_total, pairwise_polar_total_errorbars = ListGalaxyGroup.get_histogram_bins(list_pairwise_polar_differences_total, bins = np.arange(0, 185, 10), errorbarType=self.generalErrorbar, normalize_to_one=True)
         
             if len(listGG) > 1:
                 print(f"choosing ax, {i}")
@@ -906,8 +906,9 @@ class GalaxyAnalysis:
 
             
         return prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax
-        
-    def calculate_fraction_less_than_percentile(self, MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> tuple[float, float, float]:
+    
+    @staticmethod
+    def calculate_fraction_less_than_percentile(MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> tuple[float, float, float]:
         #for each galaxy group and for each projection, calculate the fraction of MRL values that are less than the given percentile of the random MRL values
         # MRL_values is a list of MRL values for each galaxy group and each projection (length is 3*number of galaxy groups since 3 projections per group)
         # random_MRL_values is a list of lists, where len(random_MRL_values) is number of galaxy groups, len(random_MRL_values[i]) is sample num (1000) * 3 projections, e.g. 3000 since 1000 for each of the 3 projections and is arranged as [rx1, ry1, rz1, rx2, ry2, rz2,...])
@@ -925,13 +926,18 @@ class GalaxyAnalysis:
         fraction = count_less_than_percentile / total_count if total_count > 0 else 0
         return fraction, count_less_than_percentile, total_count, ggIndexInconsistentWithRandom
 
-    def getPercentOfClustersAboveRandomMRLCL(self, listGG : ListGalaxyGroup, percentageMRL:float = 0.99*100, random_mrl_values:list[list[float]] = None) -> float:
-        MRL_values = listGG.compute_probablity_distribution_of_MRL_directionality(parallelize=False) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
+    @staticmethod
+    def getPercentOfClustersAboveRandomMRLCL(listGG : ListGalaxyGroup = None, percentageMRL:float = 0.99*100, random_mrl_values:list[list[float]] = None, MRL_values = None, numsamples : int = 1000) -> float:
+        if MRL_values is None:
+            if listGG is None:
+                raise ValueError("Must provide either MRL_values or listGG to compute MRL values.")
+            MRL_values = listGG.compute_probablity_distribution_of_MRL_directionality(parallelize=False) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
         if random_mrl_values is None:
-            random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=1000) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
+            # print(f"numsamples: {numsamples}")
+            random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=numsamples) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
         else:
             random_MRL_values = random_mrl_values
-        fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
+        fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom = GalaxyAnalysis.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
         print(f"Fraction of MRL values below the {percentageMRL}th percentile of random MRL values: {fraction_above_percentile:.4f} ({count_above_percentile}/{total_count})")
         return (fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values
 
@@ -944,21 +950,23 @@ class GalaxyAnalysis:
 
         for i, (listGalaxyGroup, label) in enumerate(listGG):
             # MRL_values = listGalaxyGroup.compute_probablity_distribution_of_MRL_directionality(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/MRL_values_{label}_{self.plotIdentifier}', rewrite=self.generalRewrite) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
-            (fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values = self.getPercentOfClustersAboveRandomMRLCL(listGalaxyGroup, percentageMRL=percentageMRL) # also prints the fraction of MRL values below the given percentile of random MRL values
+            print(f"running label with list: {len(listGalaxyGroup.getAllGalaxyGroups())}")
+            (fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values = GalaxyAnalysis.getPercentOfClustersAboveRandomMRLCL(listGalaxyGroup, percentageMRL=percentageMRL) # also prints the fraction of MRL values below the given percentile of random MRL values
+            print((fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values)
             if not MRL_values or len(MRL_values) == 0:
                 print(f"Skipping {label}: No MRL values to plot.")
                 continue
-            MRL_binned, MRL_bin_centers, MRL_errorbars = ListGalaxyGroup.get_histogram_bins(MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson')
+            MRL_binned, MRL_bin_centers, MRL_errorbars = ListGalaxyGroup.get_histogram_bins(MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson', density=True)
 
             # random_MRL_values = listGalaxyGroup.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=numsamples) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
             if not random_MRL_values or len(random_MRL_values) == 0:
                 print(f"Skipping {label}: No random MRL values to plot.")
                 continue
             print(f"lenMRL: {len(MRL_values)}, lenrandom: {len(random_MRL_values), len(random_MRL_values[0])}")
-            random_MRL_bins, random_MRL_bin_centers, random_MRL_errorbars = ListGalaxyGroup.get_histogram_bins(random_MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson')
+            random_MRL_bins, random_MRL_bin_centers, random_MRL_errorbars = ListGalaxyGroup.get_histogram_bins(random_MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson', density=True)
 
             if len(listGG) > 1 and not oneaxis:
-                print(f"choosing ax, {i}")
+                # print(f"choosing ax, {i}")
                 overlayAxToPlot = overlayMRLAx[i]
             else:
                 overlayAxToPlot = overlayMRLAx
@@ -979,25 +987,7 @@ class GalaxyAnalysis:
                 overlay_color=color,
                 grid=True
             )
-            #plot a small verticle line at 99th percentile of radnom MRL_values
             percentile_MRL = np.percentile(random_MRL_values, percentageMRL)
-            # overlayMRLAx.axvline(percentile_MRL, linestyle='--', label=f'99th Percentile')
-
-            # overlayMRLPlotter.scatter_plot(
-            #     random_MRL_bin_centers, 
-            #     random_MRL_bins,
-            #     # errorBars = random_MRL_errorbars,
-            #     ax=overlayAxToPlot,  # Use the same axis for overlay
-            #     # ylim = (0, 0.01),
-            #     label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
-            #     include_legend=True,
-            #     overlay_color=color,
-            #     alpha=0.5,
-            #     # output_filename=scratchPlotDirc + f'/MRL_distribution_curves_overlay_{sim}{self.plotEndingFormat}',
-            #     output_filename=None,
-
-            #     grid=True,
-            # )
 
             overlayMRLPlotter.scatter_plot(
                 random_MRL_bin_centers, 
@@ -1020,8 +1010,8 @@ class GalaxyAnalysis:
             )
             ymin, ymax = overlayAxToPlot.get_ylim()
             # overlayAxToPlot.plot([percentile_MRL, percentile_MRL], [ymin, ymax*0.1], color='blue', linestyle='--', label=f'{str(percentile_MRL)}th Percentile (20 Non-Centrals)')
-            print(f"99th percentile MRL: {percentile_MRL}")
-            print(f"Overall number of MRL values above 99th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
+            print(f"{percentageMRL}th percentile MRL: {percentile_MRL}")
+            print(f"Overall number of MRL values above {percentageMRL}th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
             
             # fraction_less_than_nth_percentile, count_less_than_percentile, total_count = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
             # overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}", loc='bottom center')
@@ -1040,65 +1030,8 @@ class GalaxyAnalysis:
                 va='center',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray'),
             )            
-            # # save into .txt file:
-            # # In table: galaxy id, num of members, mass of cluster, MRL value of that projection, fraction less than the MRL I measured
-            # with open(self.scratchPlotDirc + f'/MRL_values_and_random_comparison_{label}_{self.plotIdentifier}.txt', 'w') as f:
-            #     f.write("GalaxyGroupID\tNumMembers\tClusterMass\tMRLValue\tFractionLessThanMRL\n")
-            #     for j, gg in enumerate(listGalaxyGroup.getAllGalaxyGroups()):
-            #         print(f"processing galaxy group {j+1}/{len(listGalaxyGroup.getAllGalaxyGroups())} for fraction", end='\r', flush=True)
-            #         gg_id = gg.getGroupID()
-            #         num_members = gg.getNumSubhalos()
-            #         cluster_mass = gg.getMCrit200()
-            #         MRL_value = [MRL_values[j * 3], MRL_values[j * 3 + 1], MRL_values[j * 3 + 2]] if j * 3 + 2 < len(MRL_values) else [0, 0, 0]
-            #         fraction_less_than_MRL =[np.sum(random_MRL_values[j] < MRL_values[j * 3]) / numsamples, np.sum(random_MRL_values[j] < MRL_values[j * 3 + 1]) / numsamples, np.sum(random_MRL_values[j] < MRL_values[j * 3 + 2]) / numsamples] if j * 3 + 2 < len(MRL_values) else [0, 0, 0]
-            #         f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{MRL_value}\t{fraction_less_than_MRL}\n")
-                    
-            # #save into .txt file, all the galaxy groups who's MRL_value is greater than 0.8
-            # with open(self.scratchPlotDirc + f'/high_MRL_galaxy_groups_{label}_{self.plotIdentifier}.txt', 'w') as f:
-            #     f.write("GalaxyGroupID\tNumMembers\tClusterMass\tMRLValue\n")
-            #     for k, gg in enumerate(listGalaxyGroup.getAllGalaxyGroups()):
-            #         print(f"processing galaxy group {k+1}/{len(listGalaxyGroup.getAllGalaxyGroups())} for high MRL", end='\r', flush=True)
-            #         gg_id = gg.getGroupID()
-            #         num_members = gg.getNumSubhalos()
-            #         cluster_mass = gg.getMCrit200()
-            #         MRL_value = [MRL_values[k * 3], MRL_values[k * 3 + 1], MRL_values[k * 3 + 2]] if k * 3 + 2 < len(MRL_values) else [0, 0, 0]
-            #         if np.any(np.array(MRL_value) > 0.8):
-            #             f.write(f"{gg_id}\t{num_members}\t{cluster_mass}\t{MRL_value}\n")
-                        
-            #save bin centers and probabilities and errorbars to text file
-            # Save bin centers and probabilities and errorbars to text file, padding with NaN if needed
-            # with open(self.scratchPlotDirc + f'/MRL_distribution_curves_{label}_{self.plotIdentifier}.txt', 'w') as f:
-            #     f.write("MRLBinCenter\tMRLProbability\tMRLErrorBar\tRandomMRLBinCenter\tRandomMRLProbability\tRandomMRLErrorBar\n")
-            #     arrays = [MRL_bin_centers, MRL_binned, MRL_errorbars, random_MRL_bin_centers, random_MRL_bins, random_MRL_errorbars]
-            #     max_len = max(len(arr) for arr in arrays)
-            #     arrays_padded = [np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan) for arr in arrays]
-            #     for m in range(max_len):
-            #         f.write("\t".join(str(arr[m]) for arr in arrays_padded) + "\n")
-            # #save raw MRL values and random MRL values to text file, padding with NaN if needed
-            # with open(self.scratchPlotDirc + f'/MRL_raw_values_{label}_{self.plotIdentifier}.txt', 'w') as f:
-            #     f.write("MRLValue\tRandomMRLValue\n")
-            #     max_raw_len = max(len(MRL_values), len(random_MRL_values))
-            #     mrl_values_padded = np.pad(MRL_values, (0, max_raw_len - len(MRL_values)), constant_values=np.nan)
-            #     random_mrl_values_padded = np.pad(random_MRL_values, (0, max_raw_len - len(random_MRL_values)), constant_values=np.nan)
-            #     for n in range(max_raw_len):
-            #         f.write(f"{mrl_values_padded[n]}\t{random_mrl_values_padded[n]}\n")
-        # overlayAxToPlot.legend()
         if savefig:
             overlayMRLPlotter.save_figure(overlayMRLFig, self.scratchPlotDirc + f'/MRL_distribution_curves_overlay_{filename}_{self.plotIdentifier}{self.plotEndingFormat}') if plot_dirc is None else overlayMRLPlotter.save_figure(overlayMRLFig, plot_dirc + f'/MRL_distribution_curves_overlay_{filename}_{self.plotIdentifier}{self.plotEndingFormat}')
-        
-        # #append into overall .txt file:
-        # with open(self.scratchPlotDirc + f'/MRL_values_and_random_comparison_overall.txt', 'a') as f:
-        #     f.write(f"Simulation: {self.sim}\n")
-        #     f.write("GalaxyGroupID\tNumMembers\tClusterMass\tMRLValue\tFractionLessThanMRL\n")
-        #     for l, (listGalaxyGroup, label) in enumerate(listGG):
-        #         comparison_file = self.scratchPlotDirc + f'/MRL_values_and_random_comparison_{label}_{self.plotIdentifier}.txt'
-        #         if not os.path.exists(comparison_file):
-        #             print(f"Skipping missing file: {comparison_file}")
-        #             continue
-        #         with open(comparison_file, 'r') as g:
-        #             lines = g.readlines()
-        #             for line in lines[1:]:  # Skip header line
-        #                 f.write(line)
         return overlayMRLPlotter, overlayMRLFig, overlayMRLAx
     
     def MRLDistributionPlots(self, plot_dirc : str = None):
@@ -1268,7 +1201,7 @@ class GalaxyAnalysis:
 
         #plot the pairwise polar distribution for these high MRL groups
         high_MRL_pairwise_polar_differences = high_MRL_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_{self.plotIdentifier}', rewrite=self.generalRewrite)
-        high_MRL_pairwise_polar_bins, high_MRL_pairwise_polar_bin_centers, high_MRL_pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences, bins = np.arange(0, 185, 10), errorbarType='poisson')
+        high_MRL_pairwise_polar_bins, high_MRL_pairwise_polar_bin_centers, high_MRL_pairwise_polar_errorbars = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences, bins = np.arange(0, 185, 10), errorbarType='poisson', normalize_to_one=True)
         high_MRL_polar_plotter = AstroPlotter()
         high_MRL_polar_fig, high_MRL_polar_ax = high_MRL_polar_plotter.create_figure()
         high_MRL_polar_plotter.scatter_plot(
@@ -1288,10 +1221,10 @@ class GalaxyAnalysis:
         #plot <35% R200 and >65% R200 for these high MRL groups
         high_MRL_LT35R200_list_of_galaxy_groups = high_MRL_list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0,0.35])
         high_MRL_pairwise_polar_differences_inner = high_MRL_LT35R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_inner_{self.plotIdentifier}', rewrite=self.generalRewrite)
-        high_MRL_pairwise_polar_bins_inner, high_MRL_pairwise_polar_bin_centers_inner, high_MRL_pairwise_polar_errorbars_inner = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_inner, bins = np.arange(0, 185, 10), errorbarType='poisson')
+        high_MRL_pairwise_polar_bins_inner, high_MRL_pairwise_polar_bin_centers_inner, high_MRL_pairwise_polar_errorbars_inner = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_inner, bins = np.arange(0, 185, 10), errorbarType='poisson', normalize_to_one=True)
         high_MRL_GT65R200_list_of_galaxy_groups = high_MRL_list_of_galaxy_groups.getFilterSubhalos(withinXPercentR200=[0.65,1])
         high_MRL_pairwise_polar_differences_outer = high_MRL_GT65R200_list_of_galaxy_groups.compute_probablity_distribution_of_polar_differences(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/high_MRL_pairwise_polar_differences_outer_{self.plotIdentifier}', rewrite=self.generalRewrite)
-        high_MRL_pairwise_polar_bins_outer, high_MRL_pairwise_polar_bin_centers_outer, high_MRL_pairwise_polar_errorbars_outer = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_outer, bins = np.arange(0, 185, 10), errorbarType='poisson')
+        high_MRL_pairwise_polar_bins_outer, high_MRL_pairwise_polar_bin_centers_outer, high_MRL_pairwise_polar_errorbars_outer = ListGalaxyGroup.get_histogram_bins(high_MRL_pairwise_polar_differences_outer, bins = np.arange(0, 185, 10), errorbarType='poisson', normalize_to_one=True)
         high_MRL_polar_plotter.scatter_plot(
             high_MRL_pairwise_polar_bin_centers_inner, 
             high_MRL_pairwise_polar_bins_inner,
@@ -1457,7 +1390,7 @@ class GalaxyAnalysis:
                     ylabel = 'Probability Density'
                     title = f'Color-Weighted Pairwise Polar Difference Distribution for {self.sim} Galaxy Groups in {label}'
                 
-                bin_values, bin_centers, bin_errorbars = ListGalaxyGroup.get_histogram_bins(rawValues, bins=bin, errorbarType=self.generalErrorbar)
+                bin_values, bin_centers, bin_errorbars = ListGalaxyGroup.get_histogram_bins(rawValues, bins=bin, errorbarType=self.generalErrorbar, normalize_to_one=True)
 
                 polar_plotter.scatter_plot(
                     bin_centers, 

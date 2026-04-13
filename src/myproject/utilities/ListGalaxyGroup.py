@@ -7,7 +7,7 @@ import h5py as h5
 import numpy as np
 import os
 import pickle
-from typing import Optional
+from typing import Optional, Callable
 
 class ListGalaxyGroup:
     """
@@ -164,7 +164,7 @@ class ListGalaxyGroup:
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
                 if rewrite == False and tempSaveDir is not None and i <= start_index:
                     continue  # Skip already processed groups
-                print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()} / {len(self.listGalaxyGroups)}", end='', flush=True)
+                print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()}, {i} / {len(self.listGalaxyGroups)}", end='', flush=True)
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
 
@@ -362,7 +362,7 @@ class ListGalaxyGroup:
         '''
         random_MRL_values = []
         for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
-            print(f"Progress: Processing random MRL distribution for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
+            print(f"Progress: Processing random MRL distribution, samples:{num_samples}, for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
             random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
             random_MRL_values.append(random_MRL_value)
         return random_MRL_values
@@ -438,6 +438,44 @@ class ListGalaxyGroup:
         # return self.getAllGalaxyGroups()
         return ListGalaxyGroup(listGalaxyGroups=list_filtered_galaxy_groups, headerInformation=self.headerInformation)
                         
+    @staticmethod
+    def getFilterSubhalosLambda(listGalaxyGroups : ListGalaxyGroup, lambda_func : Callable[[Subhalo], bool], parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
+        '''
+        A more flexible version of getFilterSubhalos that accepts a lambda function to apply custom filtering criteria to each galaxy group. The lambda function should take a GalaxyGroup object as input and return a boolean indicating whether to retain the group (True) or filter it out (False).
+        
+        :param listGalaxyGroups: The ListGalaxyGroup instance containing the galaxy groups to filter.
+        :param lambda_func: A lambda function that defines the filtering criteria. It should accept a GalaxyGroup object and return True to retain or False to filter out.
+        :param parallelize: Whether to parallelize the filtering process (default is False).
+        :param n_processes: Number of processes to use if parallelizing (default is None, which uses optimal number).
+        :return: A new ListGalaxyGroup instance containing only the filtered galaxy groups.
+        '''
+        list_filtered_galaxy_groups : list[GalaxyGroup]= []
+        
+        if parallelize:
+            if n_processes is None:
+                n_processes = get_optimal_processes(len(listGalaxyGroups.listGalaxyGroups))
+            
+            print(f"Filtering subhalos with custom lambda in parallel with {n_processes} processes...")
+            
+            import multiprocessing as mp
+            with mp.Pool(processes=n_processes) as pool:
+                results = []
+                for i, result in enumerate(pool.imap(lambda gg: ListGalaxyGroup._filter_subhalos_with_lambda(gg, lambda_func), listGalaxyGroups.listGalaxyGroups), 1):
+                    results.append(result)
+                    percent = (i / len(listGalaxyGroups.listGalaxyGroups)) * 100
+                    print(f"\rProgress: {i}/{len(listGalaxyGroups.listGalaxyGroups)} ({percent:.1f}%)", end='', flush=True)
+                print()  # New line after progress
+            
+            list_filtered_galaxy_groups = [gg for gg in results if gg is not None]
+            
+            print(f"After filtering with lambda: {len(list_filtered_galaxy_groups)} galaxy groups retained.")
+        else:
+            for i, galaxyGroup in enumerate(listGalaxyGroups.listGalaxyGroups, 1):
+                print(f"Progress: Processing Galaxy Group ID {i} / {len(listGalaxyGroups.listGalaxyGroups)}", end='\r')
+                if lambda_func(galaxyGroup):
+                    list_filtered_galaxy_groups.append(galaxyGroup)
+                    
+        return ListGalaxyGroup(listGalaxyGroups=list_filtered_galaxy_groups, headerInformation=listGalaxyGroups.headerInformation)
 
     def getCorrectedPositions(self, boxsize : float, parallelize : bool=False, n_processes: Optional[int]=None) -> ListGalaxyGroup:
         '''
@@ -679,6 +717,7 @@ class ListGalaxyGroup:
         :rtype: tuple[ndarray, ndarray, ndarray]
         '''
         random_MRL_values = []
+        # print(f"running over samples: {num_samples}")
         for _ in range(num_samples):
             # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
             #for a given random position, get the xy yz and xz angles
@@ -709,8 +748,13 @@ class ListGalaxyGroup:
         return random_MRL_values
     
     @staticmethod
-    def get_histogram_bins(values: list[float], bins: Optional[float] = None, binsize: Optional[float] = None, binLow: Optional[float]=None, binHigh: Optional[float]=None, density: bool = False, errorbarType: str = 'poisson') -> np.ndarray:
-        """Helper function to compute histogram bins for pairwise differences."""
+    def get_histogram_bins(values: list[float], bins: Optional[float] = None, binsize: Optional[float] = None, binLow: Optional[float]=None, binHigh: Optional[float]=None, density: bool = False, normalize_to_one: bool = False, errorbarType: str = 'poisson') -> np.ndarray:
+        """Helper function to compute histogram bins for pairwise differences.
+
+        New parameter `normalize_to_one` when True normalizes bin heights so their
+        sum equals 1 (i.e. discrete probability per bin). This is distinct from
+        `density=True` which returns a probability density (integral over x equals 1).
+        """
         import numpy as np
         bin = None
         if bins is not None:
@@ -718,28 +762,86 @@ class ListGalaxyGroup:
         elif binsize is not None and binLow is not None and binHigh is not None:
             bin = np.arange(binLow, binHigh + binsize, binsize)
         if bin is None:
-            bin='auto'  # Default to 'auto' if no valid binning parameters provided
-        hist, bin_edges = np.histogram(values, bins=bin, density=True)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        bin_widths = bin_edges[1:] - bin_edges[:-1] #need bin widths to properly normalize poisson errors when density=True
-        if errorbarType == 'poisson':
-            errorbars = np.sqrt(hist / (len(values) * bin_widths))  # Poisson errors normalized to density
-        elif errorbarType == 'bootstrap':
-            n_bootstrap = 1000
-            bootstrap_histograms = []
-            mean_of_original_hist = np.mean(hist)
-            mean_of_boostrap_means = []
-            while mean_of_boostrap_means == []: #or np.std(mean_of_boostrap_means) > 0.05 * mean_of_original_hist:  # Continue bootstrapping until the standard deviation of the bootstrap means is less than 5% of the original mean
-                print(f"\rBootstrapping... Current std of bootstrap means: {np.std(mean_of_boostrap_means):.4f}, Original mean: {mean_of_original_hist:.4f}", end='', flush=True)
-                mean_of_boostrap_means = []
+            bin = 'auto'  # Default to 'auto' if no valid binning parameters provided
+
+        values = np.asarray(values)
+
+        # If user requests discrete normalization to one, compute counts and
+        # normalize by the total count so sum(hist) == 1.
+        if normalize_to_one:
+            counts, bin_edges = np.histogram(values, bins=bin, density=False)
+            total = counts.sum()
+            if total > 0:
+                hist = counts.astype(float) / total
+            else:
+                hist = np.zeros_like(counts, dtype=float)
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+            if errorbarType == 'poisson':
+                if total > 0:
+                    errorbars = np.sqrt(counts) / total
+                else:
+                    errorbars = np.zeros_like(hist)
+            elif errorbarType == 'bootstrap':
+                n_bootstrap = 1000
+                bootstrap_histograms = []
+                for _ in range(n_bootstrap):
+                    resampled_values = np.random.choice(values, size=len(values), replace=True)
+                    b_counts, _ = np.histogram(resampled_values, bins=bin, density=False)
+                    b_total = b_counts.sum()
+                    if b_total > 0:
+                        bootstrap_histograms.append(b_counts.astype(float) / b_total)
+                    else:
+                        bootstrap_histograms.append(np.zeros_like(counts, dtype=float))
+                errorbars = np.std(bootstrap_histograms, axis=0)
+            else:
+                raise ValueError("Invalid errorbarType. Choose 'poisson' or 'bootstrap'.")
+
+            return hist, bin_centers, errorbars
+
+        # Otherwise, follow traditional density/count behavior based on `density`
+        if density:
+            hist, bin_edges = np.histogram(values, bins=bin, density=True)
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            bin_widths = bin_edges[1:] - bin_edges[:-1]  # need bin widths to properly normalize poisson errors when density=True
+
+            if errorbarType == 'poisson':
+                N = len(values)
+                if N > 0:
+                    errorbars = np.sqrt(hist / (N * bin_widths))  # Poisson errors normalized to density
+                else:
+                    errorbars = np.zeros_like(hist)
+            elif errorbarType == 'bootstrap':
+                n_bootstrap = 1000
+                bootstrap_histograms = []
                 for _ in range(n_bootstrap):
                     resampled_values = np.random.choice(values, size=len(values), replace=True)
                     bootstrap_hist, _ = np.histogram(resampled_values, bins=bin, density=True)
                     bootstrap_histograms.append(bootstrap_hist)
-                    mean_of_boostrap_means.append(np.mean(bootstrap_hist))
+                errorbars = np.std(bootstrap_histograms, axis=0)
+            else:
+                raise ValueError("Invalid errorbarType. Choose 'poisson' or 'bootstrap'.")
+
+            return hist, bin_centers, errorbars
+
+        # density == False and normalize_to_one == False -> return raw counts
+        counts, bin_edges = np.histogram(values, bins=bin, density=False)
+        hist = counts.astype(float)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        if errorbarType == 'poisson':
+            errorbars = np.sqrt(counts)
+        elif errorbarType == 'bootstrap':
+            n_bootstrap = 1000
+            bootstrap_histograms = []
+            for _ in range(n_bootstrap):
+                resampled_values = np.random.choice(values, size=len(values), replace=True)
+                b_counts, _ = np.histogram(resampled_values, bins=bin, density=False)
+                bootstrap_histograms.append(b_counts)
             errorbars = np.std(bootstrap_histograms, axis=0)
         else:
             raise ValueError("Invalid errorbarType. Choose 'poisson' or 'bootstrap'.")
+
         return hist, bin_centers, errorbars
     
     # Standalone functions for multiprocessing (must be picklable)
@@ -1200,6 +1302,33 @@ class ListGalaxyGroup:
         if minNumGalaxies is not None and len(filtered_subhalos) < minNumGalaxies:
             return None
         if maxNumGalaxies is not None and len(filtered_subhalos) > maxNumGalaxies:
+            return None
+
+        filtered_galaxyGroup = GalaxyGroup(
+            galaxyGroup.getGroupID(),
+            galaxyGroup.getRCrit200(),
+            galaxyGroup.getMCrit200(),
+            galaxyGroup.getPosCM(),
+            galaxyGroup.getPos(),
+            filtered_subhalos,
+        )
+        return filtered_galaxyGroup
+
+    @staticmethod
+    def _filter_subhalos_with_lambda(args : tuple[GalaxyGroup, Callable[[Subhalo], bool]]):
+        """Helper function to filter subhalos for a single galaxy group using a custom lambda function."""
+        from myproject.utilities.Subhalo import Subhalo
+        from myproject.utilities.GalaxyGroup import GalaxyGroup
+        
+        galaxyGroup, filter_func = args
+        
+        subhalos = list(galaxyGroup.getSubhalos())
+        if len(subhalos) == 0:
+            return None
+
+        filtered_subhalos = [sh for sh in subhalos if filter_func(sh)]
+
+        if len(filtered_subhalos) <= 1:  # need at least central + one satellite
             return None
 
         filtered_galaxyGroup = GalaxyGroup(
