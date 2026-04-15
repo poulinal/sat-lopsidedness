@@ -268,8 +268,10 @@ class AstroPlotter:
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
-            if len(title) > 50:  # If title is long, create a new line for better formatting
-                title = title[:50] + '\n' + title[50:]
+            if len(title) > 50:  # If title is long, create a new line at the next space
+                split_idx = title.find(' ', 50)
+                if split_idx != -1:
+                    title = title[:split_idx] + '\n' + title[split_idx + 1:]
             ax.set_title(title)
         if label and not spline_curvature:
             sc.set_label(label)

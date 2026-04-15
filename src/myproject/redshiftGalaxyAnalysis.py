@@ -1010,7 +1010,7 @@ class GalaxyAnalysis:
                 ax=overlayAxToPlot,  # Use the same axis for overlay
                 xlabel='MRL Directionality',
                 ylabel='Probability Density',
-                title=f'MRL Distribution Curves vs Random for {self.sim}, {label}',
+                title=f'MRL Distribution Curves vs Random for {self.sim}',
                 # ylim = (0, 0.01),
                 label=f"Random MRL Directionality ({len(random_MRL_values)} Samples)",
                 include_legend=True,
@@ -1029,7 +1029,8 @@ class GalaxyAnalysis:
             
             # fraction_less_than_nth_percentile, count_less_than_percentile, total_count = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
             # overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}", loc='bottom center')
-            text = f"{label}, Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}"
+            label_words = ' '.join(label.split()[:2])
+            text = f"{label_words}, Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}"
             axis_key = id(overlayAxToPlot)
             textbox_index = text_box_count_by_axis.get(axis_key, 0)
             text_box_count_by_axis[axis_key] = textbox_index + 1
@@ -1364,7 +1365,7 @@ class GalaxyAnalysis:
 
         self.plot_joining_redshift_distribution_by_mass_bins(list_of_mass_bin_galaxy_groups)
         
-    def overlay_polar_pairwise_across_redshifts(self, listRedshiftGG:list[list[tuple[ListGalaxyGroup, str]]], plot_dirc:str = None, polar_plotter=None, polar_fig=None, polar_ax=None, typePlot:str = 'polar', plotRows:int = 0, plotCols:int = 0, oneaxis=False):
+    def overlay_polar_pairwise_across_redshifts(self, listRedshiftGG:list[list[tuple[ListGalaxyGroup, str]]], plot_dirc:str = None, polar_plotter=None, polar_fig=None, polar_ax=None, typePlot:str = 'polar', plotRows:int = 0, plotCols:int = 0, oneaxis=False, include_metrics:bool=False):
         if polar_plotter is None:
             polar_plotter = AstroPlotter()
         if polar_fig is None or polar_ax is None:
@@ -1419,6 +1420,18 @@ class GalaxyAnalysis:
                     output_filename=None,
                     grid=True,
                 )
+
+                #if include_metrics, include the count of polar pairs in the distribution
+                if include_metrics:
+                    total_pairs = len(rawValues)
+                    if not oneaxis:
+                        label_words = ' '.join(label.split()[:2])
+                        polar_ax_to_plot.text(0.95, 0.05, f'Total Pairs, {label_words}: {total_pairs}', transform=polar_ax_to_plot.transAxes, fontsize=7, ha='right', va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray'))
+                    else:
+                        y_offset = 0.05 + (i * 0.05)
+                        print(y_offset)
+                        label_words = ' '.join(label.split()[:2])
+                        polar_ax_to_plot.text(0.95, y_offset, f'Total Pairs, {label_words}: {total_pairs}', transform=polar_ax_to_plot.transAxes, fontsize=7, ha='right', va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray'))
         # if len(listGG) == 1:
         #     polar_ax.legend()
         # else:
