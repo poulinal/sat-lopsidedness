@@ -133,6 +133,15 @@ class GalaxyAnalysis:
         self.filtered_gt15_list_of_galaxy_groups = self.loaded_list_of_galaxy_groups.getFilterSubhalos(minGGMass=1e15)
         
         return self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups
+
+    def setMassSubgroups(self, list_mass_groups : list[ListGalaxyGroup]):
+        self.filtered_gt13_ls13p5_list_of_galaxy_groups = list_mass_groups[0]
+        self.filtered_gt13p5_ls14_list_of_galaxy_groups = list_mass_groups[1]
+        self.filtered_gt14_ls14p5_list_of_galaxy_groups = list_mass_groups[2]
+        self.filtered_gt14p5_ls15_list_of_galaxy_groups = list_mass_groups[3]
+        self.filtered_gt15_list_of_galaxy_groups = list_mass_groups[4]
+        
+        return self.filtered_gt13_ls13p5_list_of_galaxy_groups, self.filtered_gt13p5_ls14_list_of_galaxy_groups, self.filtered_gt14_ls14p5_list_of_galaxy_groups, self.filtered_gt14p5_ls15_list_of_galaxy_groups, self.filtered_gt15_list_of_galaxy_groups
         
     def pairwisePolarDifferencePlot(self, list_of_galaxy_group : ListGalaxyGroup, plot_dirc : str = None):
         print(f"generalrewrite: {self.generalRewrite}, plotidentifier: {self.plotIdentifier}")
@@ -928,6 +937,11 @@ class GalaxyAnalysis:
 
     @staticmethod
     def getPercentOfClustersAboveRandomMRLCL(listGG : ListGalaxyGroup = None, percentageMRL:float = 0.99*100, random_mrl_values:list[list[float]] = None, MRL_values = None, numsamples : int = 1000) -> float:
+        # Accept either a percentile in [0, 100] (e.g. 95) or a fraction in (0, 1] (e.g. 0.95).
+        # Internally we always work in percentile units.
+        if 0 < percentageMRL <= 1:
+            print(f"Warning: percentageMRL value {percentageMRL} is in the range (0, 1]. Interpreting this as a fraction and converting to percentage units by multiplying by 100.")
+            percentageMRL *= 100
         if MRL_values is None:
             if listGG is None:
                 raise ValueError("Must provide either MRL_values or listGG to compute MRL values.")
@@ -937,9 +951,9 @@ class GalaxyAnalysis:
             random_MRL_values = listGG.compute_MRL_random_distribution_curves_for_LGG(parallelize=False, num_samples=numsamples) # a list of lists, outer list is number of galaxy groups, inner list is the random MRL values for that galaxy group (3000 since list of rx, ry, rz 1000 times each)
         else:
             random_MRL_values = random_mrl_values
-        fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom = GalaxyAnalysis.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
-        print(f"Fraction of MRL values below the {percentageMRL}th percentile of random MRL values: {fraction_above_percentile:.4f} ({count_above_percentile}/{total_count})")
-        return (fraction_above_percentile, count_above_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values
+        fraction_above_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom = GalaxyAnalysis.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
+        print(f"Fraction of MRL values below the {percentageMRL}th percentile of random MRL values: {fraction_above_percentile:.4f} ({count_less_than_percentile}/{total_count})")
+        return (fraction_above_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values
 
     def overlayMRLAndMRLRandom(self, listGG : list[tuple[ListGalaxyGroup, str]], plot_dirc : str = None, filename:str='', percentageMRL:float = 0.99*100, oneaxis:bool=False, savefig:bool=True, getInconsistentSubhalos:bool=False):
         overlayMRLPlotter = AstroPlotter()
@@ -952,7 +966,7 @@ class GalaxyAnalysis:
             # MRL_values = listGalaxyGroup.compute_probablity_distribution_of_MRL_directionality(parallelize=False)#, tempSaveDir=f'{self.scratchDataDirc}/MRL_values_{label}_{self.plotIdentifier}', rewrite=self.generalRewrite) # a list of MRL values for each galaxy group, with length 3*number of galaxy groups since 3 projections per group
             print(f"running label with list: {len(listGalaxyGroup.getAllGalaxyGroups())}")
             (fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values = GalaxyAnalysis.getPercentOfClustersAboveRandomMRLCL(listGalaxyGroup, percentageMRL=percentageMRL) # also prints the fraction of MRL values below the given percentile of random MRL values
-            print((fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values)
+            # print((fraction_less_than_nth_percentile, count_less_than_percentile, total_count, subhaloIndexInconsistentWithRandom), MRL_values, random_MRL_values)
             if not MRL_values or len(MRL_values) == 0:
                 print(f"Skipping {label}: No MRL values to plot.")
                 continue
@@ -962,7 +976,7 @@ class GalaxyAnalysis:
             if not random_MRL_values or len(random_MRL_values) == 0:
                 print(f"Skipping {label}: No random MRL values to plot.")
                 continue
-            print(f"lenMRL: {len(MRL_values)}, lenrandom: {len(random_MRL_values), len(random_MRL_values[0])}")
+            # print(f"lenMRL: {len(MRL_values)}, lenrandom: {len(random_MRL_values), len(random_MRL_values[0])}")
             random_MRL_bins, random_MRL_bin_centers, random_MRL_errorbars = ListGalaxyGroup.get_histogram_bins(random_MRL_values, binsize=0.05, binLow=0, binHigh=1, errorbarType='poisson', density=True)
 
             if len(listGG) > 1 and not oneaxis:
@@ -987,7 +1001,7 @@ class GalaxyAnalysis:
                 overlay_color=color,
                 grid=True
             )
-            percentile_MRL = np.percentile(random_MRL_values, percentageMRL)
+            # percentile_MRL = np.percentile(random_MRL_values, percentageMRL)
 
             overlayMRLPlotter.scatter_plot(
                 random_MRL_bin_centers, 
@@ -1008,10 +1022,10 @@ class GalaxyAnalysis:
                 spline_curvature=True,
                 spline_smoothing=0,
             )
-            ymin, ymax = overlayAxToPlot.get_ylim()
+            # ymin, ymax = overlayAxToPlot.get_ylim()
             # overlayAxToPlot.plot([percentile_MRL, percentile_MRL], [ymin, ymax*0.1], color='blue', linestyle='--', label=f'{str(percentile_MRL)}th Percentile (20 Non-Centrals)')
-            print(f"{percentageMRL}th percentile MRL: {percentile_MRL}")
-            print(f"Overall number of MRL values above {percentageMRL}th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
+            # print(f"{percentageMRL}th percentile MRL: {percentile_MRL}")
+            # print(f"Overall number of MRL values above {percentageMRL}th percentile: {np.sum(np.array(MRL_values) > percentile_MRL)} out of {len(MRL_values)}")
             
             # fraction_less_than_nth_percentile, count_less_than_percentile, total_count = self.calculate_fraction_less_than_percentile(MRL_values, random_MRL_values, percentageMRL)
             # overlayMRLPlotter.add_text_box(overlayAxToPlot, f"Fraction of MRL values < {str(percentageMRL)}th percentile of random MRL: {fraction_less_than_nth_percentile:.4f} \n Count: {count_less_than_percentile}/{total_count}", loc='bottom center')

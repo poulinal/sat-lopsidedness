@@ -353,7 +353,7 @@ class ListGalaxyGroup:
             
         return self.MRL_values
     
-    def compute_MRL_random_distribution_curves_for_LGG(self, num_samples: int = 10000, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> list[float]:
+    def compute_MRL_random_distribution_curves_for_LGG(self, num_samples: int = 10000, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> list[list[float]]:
         '''
         Docstring for compute_MRL_random_distribution_curves_for_LGG. Computes the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
         
@@ -716,8 +716,10 @@ class ListGalaxyGroup:
         :return: Description
         :rtype: tuple[ndarray, ndarray, ndarray]
         '''
-        random_MRL_values = []
-        # print(f"running over samples: {num_samples}")
+        if num_non_centrals <= 0:
+            return []
+
+        random_MRL_values: list[float] = []
         for _ in range(num_samples):
             # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
             #for a given random position, get the xy yz and xz angles
@@ -725,10 +727,19 @@ class ListGalaxyGroup:
             # random_angles_yz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
             # random_angles_xz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
 
-            rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
-            random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
-            random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
-            random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
+            # rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
+            # random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
+            # random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
+            # random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
+
+            # Sample isotropic directions by drawing random 3D vectors and normalizing.
+            # This avoids angle biases introduced by sampling uniformly in a cube.
+            vec = np.random.normal(size=(num_non_centrals, 3))
+            vec /= np.linalg.norm(vec, axis=1, keepdims=True)
+
+            random_angles_xy = np.arctan2(vec[:, 1], vec[:, 0])
+            random_angles_yz = np.arctan2(vec[:, 2], vec[:, 1])
+            random_angles_xz = np.arctan2(vec[:, 2], vec[:, 0])
             
             
             cos_sum_xy = np.sum(np.cos(random_angles_xy))
