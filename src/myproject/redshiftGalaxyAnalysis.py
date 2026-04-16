@@ -917,20 +917,28 @@ class GalaxyAnalysis:
         return prob_polar_mass_plotter, prob_polar_mass_fig, prob_polar_mass_ax
     
     @staticmethod
-    def calculate_fraction_less_than_percentile(MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> tuple[float, float, float]:
+    def calculate_fraction_less_than_percentile(MRL_values: list[float], random_MRL_values: list[list[float]], percentile: float) -> tuple[float, float, float, dict[int, list[str]]]:
         #for each galaxy group and for each projection, calculate the fraction of MRL values that are less than the given percentile of the random MRL values
         # MRL_values is a list of MRL values for each galaxy group and each projection (length is 3*number of galaxy groups since 3 projections per group)
         # random_MRL_values is a list of lists, where len(random_MRL_values) is number of galaxy groups, len(random_MRL_values[i]) is sample num (1000) * 3 projections, e.g. 3000 since 1000 for each of the 3 projections and is arranged as [rx1, ry1, rz1, rx2, ry2, rz2,...])
         count_less_than_percentile = 0
         total_count = 0
-        ggIndexInconsistentWithRandom = [] # keep track of which galaxy groups have MRL values GREATER than the percentile value of random MRL values (i.e., inconsistent/extreme)
+        ggIndexInconsistentWithRandom = {} # dict, key is galaxy group index, value is list of the projections which are inconsistent with random (e.g. if projection xy and xz are above the percentile but projection yz is below, then value would be [xy, xz])
         for i in range(0, len(MRL_values), 3): # iterate through each galaxy group (3 projections per group)
             group_MRL_values = MRL_values[i:i+3] # get the 3 MRL values for this galaxy group
             group_random_MRL_values = random_MRL_values[i//3] # get the random MRL values for this galaxy group (3000 values)
             percentile_value = np.percentile(group_random_MRL_values, percentile) # calculate the percentile value for this galaxy group
             count_less_than_percentile += np.sum(np.array(group_MRL_values) < percentile_value) # count how many of the 3 MRL values are less than the percentile value and add to the total count
             if np.sum(np.array(group_MRL_values) > percentile_value) > 0: # if any of the MRL values for this galaxy group are GREATER than the percentile value, add the index to the list of inconsistent groups
-                ggIndexInconsistentWithRandom.append(i//3)
+                galaxyGroupIndex = i // 3
+                inconsistentProjections = []
+                if group_MRL_values[0] > percentile_value and group_MRL_values[0] != np.nan:
+                    inconsistentProjections.append('xy')
+                if group_MRL_values[1] > percentile_value and group_MRL_values[1] != np.nan:
+                    inconsistentProjections.append('xz')
+                if group_MRL_values[2] > percentile_value and group_MRL_values[2] != np.nan:
+                    inconsistentProjections.append('yz')
+                ggIndexInconsistentWithRandom[galaxyGroupIndex] = inconsistentProjections
             total_count += len(group_MRL_values) # add 3 to the total count since there are 3 MRL values for each galaxy group
         fraction = count_less_than_percentile / total_count if total_count > 0 else 0
         return fraction, count_less_than_percentile, total_count, ggIndexInconsistentWithRandom

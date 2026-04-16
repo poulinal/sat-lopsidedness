@@ -142,6 +142,8 @@ class ListGalaxyGroup:
             import multiprocessing as mp
             with mp.Pool(processes=n_processes) as pool:
                 for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_pairwise_for_group, self.listGalaxyGroups), 1):
+                    galaxyGroup = self.listGalaxyGroups[i-1]
+                    galaxyGroup.setPolarAngleValue(result)
                     self.list_pairwise_differences.append(result)
                     percent = (i / total) * 100
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -167,6 +169,7 @@ class ListGalaxyGroup:
                 print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()}, {i} / {len(self.listGalaxyGroups)}", end='', flush=True)
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
+                galaxyGroup.setPolarAngleValue(group_pairwise_differences)
 
                 if type(group_pairwise_differences) != list: #list[tuple[float, float, float]]
                     print(f"WARNING returning.... {group_pairwise_differences, type(group_pairwise_differences)}")
@@ -292,6 +295,8 @@ class ListGalaxyGroup:
             with mp.Pool(processes=n_processes) as pool:
                 results = []
                 for i, result in enumerate(pool.imap(ListGalaxyGroup._compute_MRL_for_group, self.listGalaxyGroups), 1):
+                    galaxyGroup = self.listGalaxyGroups[i-1]
+                    galaxyGroup.setMRLValue(result)
                     results.append(result)
                     percent = (i / total) * 100
                     print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
@@ -321,6 +326,7 @@ class ListGalaxyGroup:
                 print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
                 
                 R_values = ListGalaxyGroup._compute_MRL_for_group(galaxyGroup)
+                galaxyGroup.setMRLValue(R_values)
                 
                 if tempSaveDir is not None:
                     batch_MRL_values.extend(R_values)
@@ -364,6 +370,7 @@ class ListGalaxyGroup:
         for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
             print(f"Progress: Processing random MRL distribution, samples:{num_samples}, for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
             random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
+            galaxyGroup.setRandomMRLValue(random_MRL_value)
             random_MRL_values.append(random_MRL_value)
         return random_MRL_values
 
@@ -1089,7 +1096,7 @@ class ListGalaxyGroup:
         return group_data
 
     @staticmethod
-    def _compute_pairwise_for_group(galaxyGroup : GalaxyGroup) -> list[tuple[float, float, float]]:
+    def _compute_pairwise_for_group(galaxyGroup : GalaxyGroup, projections: list[str]=['xy', 'yz', 'xz']) -> list[tuple[float, float, float]]:
         """Helper function to compute pairwise differences for a single galaxy group.
         
         Memory-efficient streaming approach: computes angles upfront (minimal memory),
@@ -1107,11 +1114,14 @@ class ListGalaxyGroup:
         # Vectorize angle computation (minimal memory footprint)
         positions = np.array([sh.getPosition() for sh in subhalos], dtype=np.float32)
         rel_pos = positions - central_pos
-
-        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
-        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
-        angles_xz = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+    
         
+        if 'xy' in projections:
+            angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])
+        if 'yz' in projections:
+            angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
+        if 'xz' in projections:
+            angles_xz = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
 
         # Stream-compute pairwise differences without allocating full matrices
         group_pairwise_differences = []
@@ -1122,23 +1132,39 @@ class ListGalaxyGroup:
             for j in range(i + 1, num_subhalos):
                 # Compute angle differences for each plane (in radians, then convert)
                 # where delta_xy=0 corresponds to the same side and delta_xy=180 corresponds to opposite sides
-                delta_xy = angles_xy[i] - angles_xy[j]
-                delta_yz = angles_yz[i] - angles_yz[j]
-                delta_xz = angles_xz[i] - angles_xz[j]
-                
+                if 'xy' in projections:
+                    delta_xy = angles_xy[i] - angles_xy[j]
+                if 'yz' in projections:
+                    delta_yz = angles_yz[i] - angles_yz[j]
+                if 'xz' in projections:
+                    delta_xz = angles_xz[i] - angles_xz[j]
+
                 # Normalize differences to [0, π]
-                diff_xy = np.abs((delta_xy + np.pi) % (2 * np.pi) - np.pi)
-                diff_yz = np.abs((delta_yz + np.pi) % (2 * np.pi) - np.pi)
-                diff_xz = np.abs((delta_xz + np.pi) % (2 * np.pi) - np.pi)
-                
+                if 'xy' in projections:
+                    diff_xy = np.abs((delta_xy + np.pi) % (2 * np.pi) - np.pi)
+                else:
+                    diff_xy = np.nan
+                if 'yz' in projections:
+                    diff_yz = np.abs((delta_yz + np.pi) % (2 * np.pi) - np.pi)
+                else:
+                    diff_yz = np.nan
+                if 'xz' in projections:
+                    diff_xz = np.abs((delta_xz + np.pi) % (2 * np.pi) - np.pi)
+                else:
+                    diff_xz = np.nan
+
                 # Convert to degrees
                 pairwise_difference = (diff_xy * deg, diff_yz * deg, diff_xz * deg)
-                group_pairwise_differences.append(pairwise_difference)
+                
+                # Append only non-NaN values
+                filtered_difference = tuple(val for val in pairwise_difference if not np.isnan(val))
+                if filtered_difference:
+                    group_pairwise_differences.append(filtered_difference)
         
         return group_pairwise_differences
     
     @staticmethod
-    def _compute_MRL_for_group(galaxyGroup : GalaxyGroup) -> list[float]:
+    def _compute_MRL_for_group(galaxyGroup : GalaxyGroup, projections : list[str]) -> list[float]:
         """Helper function to compute MRL for a single galaxy group using individual satellite angles.
         
         Computes the Mean Resultant Length for each plane (XY, YZ, XZ) based on the angular
@@ -1160,24 +1186,36 @@ class ListGalaxyGroup:
         rel_pos = positions - central_pos
         
         # Compute polar angles using arctan
-        angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane: arctan2(y, x)
-        angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane: arctan2(z, y)
-        angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(x, z)
+        if 'xy' in projections:
+            angles_xy = np.arctan2(rel_pos[:, 1], rel_pos[:, 0])  # XY plane: arctan2(y, x)
+        if 'yz' in projections:
+            angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane: arctan2(z, y)
+        if 'xz' in projections:
+            angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(x, z)
         
         # Compute MRL for XY plane
-        cos_sum_xy = np.sum(np.cos(angles_xy))
-        sin_sum_xy = np.sum(np.sin(angles_xy))
-        R_xy = (1/n) * np.sqrt(cos_sum_xy**2 + sin_sum_xy**2)
-        
+        if 'xy' in projections:
+            cos_sum_xy = np.sum(np.cos(angles_xy))
+            sin_sum_xy = np.sum(np.sin(angles_xy))
+            R_xy = (1/n) * np.sqrt(cos_sum_xy**2 + sin_sum_xy**2)
+        else:
+            R_xy = np.nan
+
         # Compute MRL for YZ plane
-        cos_sum_yz = np.sum(np.cos(angles_yz))
-        sin_sum_yz = np.sum(np.sin(angles_yz))
-        R_yz = (1/n) * np.sqrt(cos_sum_yz**2 + sin_sum_yz**2)
-        
+        if 'yz' in projections:
+            cos_sum_yz = np.sum(np.cos(angles_yz))
+            sin_sum_yz = np.sum(np.sin(angles_yz))
+            R_yz = (1/n) * np.sqrt(cos_sum_yz**2 + sin_sum_yz**2)
+        else:
+            R_yz = np.nan
+
         # Compute MRL for XZ plane
-        cos_sum_xz = np.sum(np.cos(angles_xz))
-        sin_sum_xz = np.sum(np.sin(angles_xz))
-        R_xz = (1/n) * np.sqrt(cos_sum_xz**2 + sin_sum_xz**2)
+        if 'xz' in projections:
+            cos_sum_xz = np.sum(np.cos(angles_xz))
+            sin_sum_xz = np.sum(np.sin(angles_xz))
+            R_xz = (1/n) * np.sqrt(cos_sum_xz**2 + sin_sum_xz**2)
+        else:
+            R_xz = np.nan
 
         print(f"final: {[R_xy, R_yz, R_xz]}") if id == 0 else None
         

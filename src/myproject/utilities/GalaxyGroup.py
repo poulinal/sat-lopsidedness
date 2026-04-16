@@ -15,6 +15,10 @@ class GalaxyGroup:
         self.centralSubhalo = None
     
         self.listSubhalos = self.setSubhaloList(listSubhalos)
+        
+        self.MRLValue : tuple[float, float, float] = None # R value of xy, yz, and xz planes
+        self.randomMRLValue : tuple[float, float, float] = None # R value of xy, yz, and xz planes for random subhalo pairs in the group
+        self.polarAngleValue : list[float] = None # polar angle values of subhalo pairs in the group in xy, yz, and xz planes
 
     def setSubhaloList(self, newListSubhalos : list[Subhalo]):
         self.listSubhalos = newListSubhalos
@@ -126,4 +130,21 @@ class GalaxyGroup:
         # print("Couldnt find subhalo idx")
         return None
     
+    def setMRLValue(self, newMRLValue : tuple[float, float, float]):
+        self.MRLValue = newMRLValue
+        
+    def setRandomMRLValue(self, newRandomMRLValue : tuple[float, float, float]):
+        self.randomMRLValue = newRandomMRLValue
+        
+    def setPolarAngleValue(self, newPolarAngleValue : list[float]):
+        self.polarAngleValue = newPolarAngleValue
+        
+    def getMRLValue(self) -> tuple[float, float, float] | None:
+        return self.MRLValue
+    
+    def getRandomMRLValue(self) -> tuple[float, float, float] | None:
+        return self.randomMRLValue
+
+    def getPolarAngleValue(self) -> list[float] | None:
+        return self.polarAngleValue
     
