@@ -1164,7 +1164,7 @@ class ListGalaxyGroup:
         return group_pairwise_differences
     
     @staticmethod
-    def _compute_MRL_for_group(galaxyGroup : GalaxyGroup, projections : list[str]) -> list[float]:
+    def _compute_MRL_for_group(galaxyGroup : GalaxyGroup, projections : list[str]=['xy', 'yz', 'xz']) -> list[float]:
         """Helper function to compute MRL for a single galaxy group using individual satellite angles.
         
         Computes the Mean Resultant Length for each plane (XY, YZ, XZ) based on the angular
