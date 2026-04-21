@@ -1121,7 +1121,7 @@ class ListGalaxyGroup:
         if 'yz' in projections:
             angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])
         if 'xz' in projections:
-            angles_xz = np.arctan2(rel_pos[:, 0], rel_pos[:, 2])
+            angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])
 
         # Stream-compute pairwise differences without allocating full matrices
         group_pairwise_differences = []
@@ -1191,7 +1191,7 @@ class ListGalaxyGroup:
         if 'yz' in projections:
             angles_yz = np.arctan2(rel_pos[:, 2], rel_pos[:, 1])  # YZ plane: arctan2(z, y)
         if 'xz' in projections:
-            angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(x, z)
+            angles_xz = np.arctan2(rel_pos[:, 2], rel_pos[:, 0])  # XZ plane: arctan2(z, x)
         
         # Compute MRL for XY plane
         if 'xy' in projections:
@@ -1217,7 +1217,7 @@ class ListGalaxyGroup:
         else:
             R_xz = np.nan
 
-        print(f"final: {[R_xy, R_yz, R_xz]}") if id == 0 else None
+        # print(f"final: {[R_xy, R_yz, R_xz]}") if id == 0 else None
         
         return [R_xy, R_yz, R_xz]
 
