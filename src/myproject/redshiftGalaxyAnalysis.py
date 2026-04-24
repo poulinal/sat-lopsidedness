@@ -932,12 +932,12 @@ class GalaxyAnalysis:
             if np.sum(np.array(group_MRL_values) > percentile_value) > 0: # if any of the MRL values for this galaxy group are GREATER than the percentile value, add the index to the list of inconsistent groups
                 galaxyGroupIndex = i // 3
                 inconsistentProjections = []
-                if group_MRL_values[0] > percentile_value and group_MRL_values[0] != np.nan:
+                if group_MRL_values[0] > percentile_value and np.isfinite(group_MRL_values[0]):
                     inconsistentProjections.append('xy')
-                if group_MRL_values[1] > percentile_value and group_MRL_values[1] != np.nan:
-                    inconsistentProjections.append('xz')
-                if group_MRL_values[2] > percentile_value and group_MRL_values[2] != np.nan:
+                if group_MRL_values[1] > percentile_value and np.isfinite(group_MRL_values[1]):
                     inconsistentProjections.append('yz')
+                if group_MRL_values[2] > percentile_value and np.isfinite(group_MRL_values[2]):
+                    inconsistentProjections.append('xz')
                 ggIndexInconsistentWithRandom[galaxyGroupIndex] = inconsistentProjections
             total_count += len(group_MRL_values) # add 3 to the total count since there are 3 MRL values for each galaxy group
         fraction = count_less_than_percentile / total_count if total_count > 0 else 0

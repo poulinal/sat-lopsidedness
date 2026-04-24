@@ -703,67 +703,87 @@ class ListGalaxyGroup:
         print(f"\nLoaded {len(self.listGalaxyGroups)} galaxy groups from HDF5.")
 
     @staticmethod
-    def compute_an_MRL_distribution_curves(num_samples: int = 10000, num_non_centrals: int = 20, parallelize: bool = False, n_processes: Optional[int] = None, tempSaveDir: Optional[str] = None, rewrite: bool = False) -> list[tuple[np.ndarray, np.ndarray]]:
-        '''
-        Docstring for compute_an_MRL_distribution_curves. Plots the distribution of MRL values for random samples of satellite galaxies to compare against the observed MRL distribution from the galaxy groups. This can help determine if the observed MRL values are significantly different from what would be expected from random distributions of satellites.
-        
-        :param self: Description
-        :param num_samples: Description
-        :type num_samples: int
-        :param num_non_centrals: Description
-        :type num_non_centrals: int
-        :param parallelize: Description
-        :type parallelize: bool
-        :param n_processes: Description
-        :type n_processes: Optional[int]
-        :param tempSaveDir: Description
-        :type tempSaveDir: Optional[str]
-        :param rewrite: Description
-        :type rewrite: bool
-        :return: Description
-        :rtype: tuple[ndarray, ndarray, ndarray]
-        '''
-        if num_non_centrals <= 0:
+    def compute_an_MRL_distribution_curves(
+        num_samples: int = 10000,
+        num_non_centrals: int = 20,
+        parallelize: bool = False,
+        n_processes: Optional[int] = None,
+        tempSaveDir: Optional[str] = None,
+        rewrite: bool = False,
+        batch_size: int = 2048,
+    ) -> list[float]:
+        """Generate a random/isotropic MRL distribution for a given satellite count i.e. for a single galaxy group.
+
+        Returns a flat list of length ``3 * num_samples`` with values in the order
+        ``[R_xy, R_yz, R_xz]`` for each sample, matching the rest of the codebase.
+
+        Notes
+        -----
+        Performance is dominated by sampling and trig. This implementation is
+        vectorized and avoids computing angles + sin/cos by using the identity:
+        for ``theta = arctan2(y, x)``, ``cos(theta) = x / r`` and ``sin(theta) = y / r``
+        with ``r = sqrt(x^2 + y^2)``.
+
+        The ``parallelize``, ``n_processes``, ``tempSaveDir``, and ``rewrite``
+        parameters are currently unused here (kept for backward compatibility).
+        """
+        import numpy as np
+
+        if num_samples <= 0 or num_non_centrals <= 0:
             return []
 
-        random_MRL_values: list[float] = []
-        for _ in range(num_samples):
-            # random_angles = np.random.uniform(0, 180, size=num_non_centrals)  # Random angles between 0 and 180 degrees
-            #for a given random position, get the xy yz and xz angles
-            # random_angles_xy = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
-            # random_angles_yz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
-            # random_angles_xz = np.radians(np.random.uniform(0, 180, size=num_non_centrals))
+        # Keep memory bounded for large (num_samples, num_non_centrals).
+        batch_size = int(batch_size) if batch_size and batch_size > 0 else num_samples
 
-            # rel_positions = np.random.uniform(-1, 1, size=(num_non_centrals, 3))  # Random relative positions in 3D space
-            # random_angles_xy = np.arctan2(rel_positions[:, 1], rel_positions[:, 0]) #% np.pi # Angle in XY plane
-            # random_angles_yz = np.arctan2(rel_positions[:, 2], rel_positions[:, 1]) #% np.pi  # Angle in YZ plane
-            # random_angles_xz = np.arctan2(rel_positions[:, 2], rel_positions[:, 0]) #% np.pi  # Angle in XZ plane
+        rng = np.random.default_rng()
+        out = np.empty((num_samples, 3), dtype=np.float32)
 
-            # Sample isotropic directions by drawing random 3D vectors and normalizing.
-            # This avoids angle biases introduced by sampling uniformly in a cube.
-            vec = np.random.normal(size=(num_non_centrals, 3))
-            vec /= np.linalg.norm(vec, axis=1, keepdims=True)
+        # Draw isotropic directions: N(0,1) in 3D then normalize.
+        for start in range(0, num_samples, batch_size):
+            stop = min(start + batch_size, num_samples)
+            b = stop - start
 
-            random_angles_xy = np.arctan2(vec[:, 1], vec[:, 0])
-            random_angles_yz = np.arctan2(vec[:, 2], vec[:, 1])
-            random_angles_xz = np.arctan2(vec[:, 2], vec[:, 0])
-            
-            
-            cos_sum_xy = np.sum(np.cos(random_angles_xy))
-            sin_sum_xy = np.sum(np.sin(random_angles_xy))
-            R_xy = np.sqrt(cos_sum_xy**2 + sin_sum_xy**2) / num_non_centrals
-            
-            cos_sum_yz = np.sum(np.cos(random_angles_yz))
-            sin_sum_yz = np.sum(np.sin(random_angles_yz))
-            R_yz = np.sqrt(cos_sum_yz**2 + sin_sum_yz**2) / num_non_centrals
-            
-            cos_sum_xz = np.sum(np.cos(random_angles_xz))
-            sin_sum_xz = np.sum(np.sin(random_angles_xz))
-            R_xz = np.sqrt(cos_sum_xz**2 + sin_sum_xz**2) / num_non_centrals
-            
-            random_MRL_values.extend([R_xy, R_yz, R_xz])
-            
-        return random_MRL_values
+            vec = rng.normal(size=(b, num_non_centrals, 3)).astype(np.float32, copy=False)
+            vec /= np.linalg.norm(vec, axis=2, keepdims=True)
+
+            x = vec[..., 0]
+            y = vec[..., 1]
+            z = vec[..., 2]
+
+            eps = np.finfo(np.float32).tiny
+
+            # XY plane
+            r_xy = np.sqrt(x * x + y * y)
+            r_xy = np.maximum(r_xy, eps)
+            ux = x / r_xy
+            uy = y / r_xy
+            sum_ux = ux.sum(axis=1)
+            sum_uy = uy.sum(axis=1)
+            R_xy = np.sqrt(sum_ux * sum_ux + sum_uy * sum_uy) / num_non_centrals
+
+            # YZ plane
+            r_yz = np.sqrt(y * y + z * z)
+            r_yz = np.maximum(r_yz, eps)
+            uy2 = y / r_yz
+            uz = z / r_yz
+            sum_uy2 = uy2.sum(axis=1)
+            sum_uz = uz.sum(axis=1)
+            R_yz = np.sqrt(sum_uy2 * sum_uy2 + sum_uz * sum_uz) / num_non_centrals
+
+            # XZ plane
+            r_xz = np.sqrt(x * x + z * z)
+            r_xz = np.maximum(r_xz, eps)
+            ux2 = x / r_xz
+            uz2 = z / r_xz
+            sum_ux2 = ux2.sum(axis=1)
+            sum_uz2 = uz2.sum(axis=1)
+            R_xz = np.sqrt(sum_ux2 * sum_ux2 + sum_uz2 * sum_uz2) / num_non_centrals
+
+            out[start:stop, 0] = R_xy
+            out[start:stop, 1] = R_yz
+            out[start:stop, 2] = R_xz
+
+        return out.ravel().astype(float).tolist()
     
     @staticmethod
     def get_histogram_bins(values: list[float], bins: Optional[float] = None, binsize: Optional[float] = None, binLow: Optional[float]=None, binHigh: Optional[float]=None, density: bool = False, normalize_to_one: bool = False, errorbarType: str = 'poisson') -> np.ndarray:
