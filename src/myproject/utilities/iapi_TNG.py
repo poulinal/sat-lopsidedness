@@ -77,7 +77,7 @@ def get(path, params=None, fName='temp'): # gets data from url, saves to file
     if (len(headers['api-key'])!=32):
         print("Check your api key")
     r = requests.get(path, params=params, headers=headers, timeout=50000)
-    # print(f"Response code: {r.status_code}")
+    print(f"Response code: {r.status_code}")
     # r.raise_for_status()
 
     # r = requests.get(path, params=params, headers=headers, allow_redirects=False, timeout=1020)
