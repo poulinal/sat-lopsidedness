@@ -32,13 +32,21 @@ class JoinTime():
         #some subhalos don't have merger trees
         fname = fname+'/sublink_mpb_'+str(subid) if fname != '' else ''
         fName = 'Trees/sublink_mpb_'+str(subid) if fname == '' else fname
-        if os.path.exists(fName+'.hdf5'):
-            return(fName+'.hdf5')
-        else:
-            print(f"file does not exist: {fName}.hdf5")
+        if os.path.exists(fname+'.hdf5'):
+            return(fname+'.hdf5')
+        # else:
+            # print(f"file does not exist: {fname}.hdf5")
+        # print(f"jointime, fName: {fName}")
         url=f'https://www.tng-project.org/api/{self.sim}/snapshots/{self.snapshot}/subhalos/'+str(subid)+'/sublink/mpb.hdf5'
         tree=get(url,fName=fName)
+        # print(tree)
         return(tree)
+
+        # fName = 'trees/sublink_mpb_'+str(subid)
+        # if os.path.exists(fName+'.hdf5'):
+        #     return(fName+'.hdf5')
+        # url='https://www.tng-project.org/api/TNG100-1/snapshots/'+snapnum+'/subhalos/'+str(subid)+'/sublink/mpb.hdf5'
+        # tree=get(url,fName=fName)
 
     def getredshift(self, snapnum):
         #convert a snapshot number to a redshift

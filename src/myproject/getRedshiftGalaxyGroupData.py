@@ -31,7 +31,7 @@ class GalaxyGroupData:
 
         baseUrl = 'http://www.tng-project.org/api/'
         r=iapi_TNG.get(baseUrl)
-        print("r: ", r)
+        # print("r: ", r)
         #check the properties of the simulation you have selected
         self.simUrl = baseUrl+self.sim
         print(self.simUrl) 
@@ -90,18 +90,21 @@ class GalaxyGroupData:
                 # if snapshot > 60:
                 #     print(f"previously got all data for {snapshot}")
                 #     continue
+                # if snapshot > 67:
+                #     continue
                 if snapshot < 50:
                     print(f"Skipping redshifts less than snapshot 50 aka redshift 1.5 due to smoothing length change, {snapshot}")
                     continue
+                print(f"running snapshot: {snapshot}")
                 subhalo_id = None #placeholder since we will be fetching all subhalos
                 self.__init__(sim, snapshot)
                 print(f"New z: {self.z}")
                 self.getSubhaloData(sim, snapshot)
                 self.getGroupData(sim, snapshot)
                 self.getListGalaxyGroup()
-                self.filterToPrimaryGalaxyGroups() if sim == 'TNG-Cluster' else None #for cluster, we only want to keep the primary galaxy groups since the secondaries are in different environments and we won't be analyzing them in the same way
+                # self.filterToPrimaryGalaxyGroups() if sim == 'TNG-Cluster' else None #for cluster, we only want to keep the primary galaxy groups since the secondaries are in different environments and we won't be analyzing them in the same way
                 self.correctTheData()
-                self.satelliteJoinTimeDic : dict[int, tuple[float, float, float, float, float, float, float, float, float, float, float, float, float, float, float]] = self.get_satellite_join_time(self.filtered_and_corrected_list_galaxy_groups, parallelize=True, rewrite=False) if snapshot == 99 and sim=='TNG300-1' else np.full(len(self.flag), np.nan)
+                self.satelliteJoinTimeDic : dict[int, tuple[float, float, float, float, float, float, float, float, float, float, float, float, float, float, float]] = self.get_satellite_join_time(self.filtered_and_corrected_list_galaxy_groups, parallelize=True, rewrite=False) if snapshot == 99 else np.full(len(self.flag), np.nan)
                 self.updateSubhalosWithJoinTimes() if snapshot == 99 and sim=='TNG300-1' else None
 
                 self.saveListGalaxyGroup(additionalFileIdentifier)
@@ -115,7 +118,10 @@ class GalaxyGroupData:
             'hubble_param': self.simdata.get('hubble'),
             'redshift': self.z,
             'scale_factor': self.a,
+            'important filters': "minGGMass=1e13, satWithinR200, M_r_max = -15"
         }
+        print("headerInformation:")
+        print(headerInformation.items())
         
         list_of_galaxy_groups : ListGalaxyGroup = ListGalaxyGroup(headerInformation = headerInformation, listGalaxyGroups=[])
 
@@ -184,7 +190,8 @@ class GalaxyGroupData:
         print(f' Average satellites: {corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         
         # self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, M_r_max=-15, satWithinR200=True, parallelize=True)
-        self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, satWithinR200=True, parallelize=True)
+        self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, M_default_r_max=-15, satWithinR200=True, parallelize=True)
+        # self.filtered_and_corrected_list_galaxy_groups = corrected_list_galaxy_groups.getFilterSubhalos(minGGMass=1e13, centralPosTolerance_kpc=None, satWithinR200=True, parallelize=True)
         print(f'After filtering, ListGalaxyGroup has {self.filtered_and_corrected_list_galaxy_groups.getNumGalaxyGroups()} galaxy groups.')
         print(f' Average satellites: {self.filtered_and_corrected_list_galaxy_groups.getAverageNumSubhalosPerGalaxyGroup()}')
         print(f' Range of satellites: {self.filtered_and_corrected_list_galaxy_groups.getRangeOfNumSubhalos()}')
@@ -242,7 +249,7 @@ class GalaxyGroupData:
         stellar_mass=mass[:,4]
         print(stellar_mass)
 
-        stellar_mass=stellar_mass*10**10 * self.a / self.h #convert to one solar masses
+        stellar_mass=stellar_mass*10**10 / self.h #convert to one solar masses
         return mass, stellar_mass
 
     def getSubhaloGroupNumData(self, sim, snapshot):
@@ -270,7 +277,7 @@ class GalaxyGroupData:
         subhaloHalfmassRad = iapi_TNG.getSubhaloField('SubhaloHalfmassRad',simulation = sim,fileName=self.scratchDataDirc+'catalogs/SubhaloHalfmassRad/SubhaloHalfmassRad',snapshot=snapshot,rewriteFile=0) # in ckpc/h
 
         ## convert to kpc
-        subhaloHalfmassRad = subhaloHalfmassRad * self.a / self.h  # kpc
+        subhaloHalfmassRad = subhaloHalfmassRad / self.h  # kpc
         return subhaloHalfmassRad
         
     def getSubhaloVMaxData(self, sim, snapshot):
@@ -357,7 +364,7 @@ class GalaxyGroupData:
         groupMCrit200 = iapi_TNG.getHaloField('Group_M_Crit200',simulation = sim,fileName=self.scratchDataDirc+'catalogs/GroupMCrit200/GroupMCrit200',snapshot=snapshot,rewriteFile=0) # in 10^10 solar masses/h
 
         ## convert to solar masses
-        groupMCrit200 = groupMCrit200 * 1e10 * self.a / self.h  # solar masses
+        groupMCrit200 = groupMCrit200 * 1e10 / self.h  # solar masses
 
         validGroupMassIndexes = np.where(groupMCrit200 > 1e13)[0]
         print(validGroupMassIndexes)

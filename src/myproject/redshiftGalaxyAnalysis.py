@@ -74,6 +74,7 @@ class GalaxyAnalysis:
         # data_file = localDataDirc + f'/galaxy_data_{sim}.hdf5'
         if preloaded_list_of_galaxy_groupsRaw is None:
             with h5.File(data_file, 'r') as f:
+                # print(f)
                 self.loaded_list_of_galaxy_groupsRaw = ListGalaxyGroup.from_hdf5(f)
             if self.sim == 'TNG300-1, TNG-Cluster' or self.sim == 'TNG-Cluster, TNG300-1':
                 with h5.File(data_file_cluster, 'r') as f:
