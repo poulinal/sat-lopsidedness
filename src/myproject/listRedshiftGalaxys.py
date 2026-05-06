@@ -2,6 +2,7 @@
 
 from myproject.redshiftGalaxyAnalysis import GalaxyAnalysis
 from myproject.utilities.snapshotEnum import SnapshotEnum
+from myproject.utilities.ListGalaxyGroup import ListGalaxyGroup
 
 class ListRedshiftGalaxy:
     def __init__(self):
@@ -21,11 +22,14 @@ class ListRedshiftGalaxy:
     def addGalaxyAnalysis(self, snapshot_enum : str, galaxy_analysis : GalaxyAnalysis):
         self.galaxy_dic[snapshot_enum] = galaxy_analysis
         
-    def initializeAllGalaxyAnalysis(self, snapshot_enums : list, simulation:str, luminosityType:str, generalErrorbar:str = 'poisson', generalRewrite:bool = True):
+    def initializeAllGalaxyAnalysis(self, snapshot_enums : list, simulation:str, luminosityType:str, generalErrorbar:str = 'poisson', generalRewrite:bool = True, list_loaded_list_of_galaxy_groupsRaw : ListGalaxyGroup = None):
         if luminosityType not in ['SDSS', 'Default']:
             raise ValueError("Invalid luminosity type. Must be 'SDSS' or 'Default'.")
         if simulation not in ['TNG300-1', 'TNG-Cluster', 'TNG300-1, TNG-Cluster', 'TNG-Cluster, TNG300-1']:
             raise ValueError("Invalid simulation. Must be 'TNG300-1' or 'TNG-Cluster' or 'TNG300-1, TNG-Cluster' or 'TNG-Cluster, TNG300-1'.")
-        for snapshot_enum in snapshot_enums:
-            galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType)
+        for i, snapshot_enum in enumerate(snapshot_enums):
+            if list_loaded_list_of_galaxy_groupsRaw is not None:
+                galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType, loaded_list_of_galaxy_groupsRaw=list_loaded_list_of_galaxy_groupsRaw[i])
+            else:
+                galaxy_analysis = GalaxyAnalysis(sim=simulation, snapshot=snapshot_enum, generalErrorbar=generalErrorbar, generalRewrite=generalRewrite, luminosityType=luminosityType)
             self.addGalaxyAnalysis(snapshot_enum, galaxy_analysis)

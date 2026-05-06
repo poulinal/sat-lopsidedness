@@ -114,7 +114,7 @@ class AstroPlotter:
         
     def create_figure(self, nrows: int = 1, ncols: int = 1, 
                      figsize: Optional[Tuple[float, float]] = None,
-                     **kwargs) -> Tuple[Figure, Union[Axes, np.ndarray]]:
+                     **kwargs) -> Tuple[Figure, Union[Axes, np.ndarray[Axes]]]:
         """
         Create a figure with subplots.
         
