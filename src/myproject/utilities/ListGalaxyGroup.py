@@ -138,6 +138,7 @@ class ListGalaxyGroup:
         
             print(f"Computing pairwise differences in parallel with {n_processes} processes...")
             total = len(self.listGalaxyGroups)
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             import multiprocessing as mp
             with mp.Pool(processes=n_processes) as pool:
@@ -145,8 +146,9 @@ class ListGalaxyGroup:
                     galaxyGroup = self.listGalaxyGroups[i-1]
                     galaxyGroup.setPolarAngleValue(result)
                     self.list_pairwise_differences.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
         else:
             start_index = 0
@@ -163,10 +165,12 @@ class ListGalaxyGroup:
                     print(f"Resuming from existing temp file: {last_file}")
                     start_index = int(last_file.split('_')[2].split('.')[0])
                 
+            print_interval = max(1, len(self.listGalaxyGroups) // 10)  # Print every ~10% of progress
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
                 if rewrite == False and tempSaveDir is not None and i <= start_index:
                     continue  # Skip already processed groups
-                print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()}, {i} / {len(self.listGalaxyGroups)}", end='', flush=True)
+                if i % print_interval == 0 or i == len(self.listGalaxyGroups):
+                    print(f"\rProgress: Processing Galaxy Group ID {galaxyGroup.getGroupID()}, {i} / {len(self.listGalaxyGroups)}", end='', flush=True)
                 group_pairwise_differences = []
                 group_pairwise_differences = ListGalaxyGroup._compute_pairwise_for_group(galaxyGroup)
                 galaxyGroup.setPolarAngleValue(group_pairwise_differences)
@@ -290,6 +294,7 @@ class ListGalaxyGroup:
             
             print(f"Computing MRL directionality in parallel with {n_processes} processes...")
             total = len(self.listGalaxyGroups)
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             import multiprocessing as mp
             with mp.Pool(processes=n_processes) as pool:
@@ -298,8 +303,9 @@ class ListGalaxyGroup:
                     galaxyGroup = self.listGalaxyGroups[i-1]
                     galaxyGroup.setMRLValue(result)
                     results.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
             # Flatten results (each result is [R_xy, R_yz, R_zx])
@@ -319,11 +325,13 @@ class ListGalaxyGroup:
                     print(f"Resuming from existing temp file: {last_file}")
                     start_index = int(last_file.split('_')[2].split('.')[0])
             
+            print_interval = max(1, len(self.listGalaxyGroups) // 10)  # Print every ~10% of progress
             for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
                 if rewrite == False and tempSaveDir is not None and 'start_index' in locals() and i <= start_index:
                     continue  # Skip already processed groups
-                    
-                print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
+                
+                if i % print_interval == 0 or i == len(self.listGalaxyGroups):
+                    print(f"Progress: Processing Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
                 
                 R_values = ListGalaxyGroup._compute_MRL_for_group(galaxyGroup)
                 galaxyGroup.setMRLValue(R_values)
@@ -367,8 +375,10 @@ class ListGalaxyGroup:
         :rtype: list[float]
         '''
         random_MRL_values = []
+        print_interval = max(1, len(self.listGalaxyGroups) // 10)  # Print every ~10% of progress
         for i, galaxyGroup in enumerate(self.listGalaxyGroups, 1):
-            print(f"Progress: Processing random MRL distribution, samples:{num_samples}, for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
+            if i % print_interval == 0 or i == len(self.listGalaxyGroups):
+                print(f"Progress: Processing random MRL distribution, samples:{num_samples}, for Galaxy Group {i} / {len(self.listGalaxyGroups)} with {galaxyGroup.getNumSubhalos()} satellites", end='\r', flush=True)
             random_MRL_value = ListGalaxyGroup.compute_an_MRL_distribution_curves(num_samples=num_samples, num_non_centrals=len(galaxyGroup.getSatelliteSubhalos()), parallelize=parallelize, n_processes=n_processes, tempSaveDir=tempSaveDir, rewrite=rewrite)
             galaxyGroup.setRandomMRLValue(random_MRL_value)
             random_MRL_values.append(random_MRL_value)
@@ -416,6 +426,7 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(len(self.listGalaxyGroups))
             
             print(f"Filtering subhalos in parallel with {n_processes} processes...")
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             # Use imap to get results as they complete (allows progress tracking)
             # imap doesn't unpack tuples, unlike istarmap
@@ -424,8 +435,9 @@ class ListGalaxyGroup:
                 results = []
                 for i, result in enumerate(pool.imap(ListGalaxyGroup._filter_subhalos_for_group, args_list), 1):
                     results.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
             # Filter out None results (skipped groups)
@@ -435,8 +447,10 @@ class ListGalaxyGroup:
             print(f"After filtering: {self.lenGalaxyGroups} galaxy groups retained.")
         else:
             list_filtered_galaxy_groups : list[GalaxyGroup]= []
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             for i, args in enumerate(args_list):
-                print(f"Progress: Processing Galaxy Group ID {i+1} / {total}", end='\r')
+                if i % print_interval == 0 or i == total - 1:
+                    print(f"Progress: Processing Galaxy Group ID {i+1} / {total}", end='\r')
                 list_filtered_galaxy_groups.append(ListGalaxyGroup._filter_subhalos_for_group(args))
                     
             # self.setGalaxyGroups([gg for gg in list_filtered_galaxy_groups if gg is not None])
@@ -463,14 +477,16 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(len(listGalaxyGroups.listGalaxyGroups))
             
             print(f"Filtering subhalos with custom lambda in parallel with {n_processes} processes...")
+            print_interval = max(1, len(listGalaxyGroups.listGalaxyGroups) // 10)  # Print every ~10% of progress
             
             import multiprocessing as mp
             with mp.Pool(processes=n_processes) as pool:
                 results = []
                 for i, result in enumerate(pool.imap(lambda gg: ListGalaxyGroup._filter_subhalos_with_lambda(gg, lambda_func), listGalaxyGroups.listGalaxyGroups), 1):
                     results.append(result)
-                    percent = (i / len(listGalaxyGroups.listGalaxyGroups)) * 100
-                    print(f"\rProgress: {i}/{len(listGalaxyGroups.listGalaxyGroups)} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == len(listGalaxyGroups.listGalaxyGroups):
+                        percent = (i / len(listGalaxyGroups.listGalaxyGroups)) * 100
+                        print(f"\rProgress: {i}/{len(listGalaxyGroups.listGalaxyGroups)} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
             list_filtered_galaxy_groups = [gg for gg in results if gg is not None]
@@ -478,7 +494,8 @@ class ListGalaxyGroup:
             print(f"After filtering with lambda: {len(list_filtered_galaxy_groups)} galaxy groups retained.")
         else:
             for i, galaxyGroup in enumerate(listGalaxyGroups.listGalaxyGroups, 1):
-                print(f"Progress: Processing Galaxy Group ID {i} / {len(listGalaxyGroups.listGalaxyGroups)}", end='\r')
+                if i % max(1, len(listGalaxyGroups.listGalaxyGroups) // 10) == 0 or i == len(listGalaxyGroups.listGalaxyGroups):
+                    print(f"Progress: Processing Galaxy Group ID {i} / {len(listGalaxyGroups.listGalaxyGroups)}", end='\r')
                 if lambda_func(galaxyGroup):
                     list_filtered_galaxy_groups.append(galaxyGroup)
                     
@@ -501,6 +518,7 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(len(self.listGalaxyGroups))
             
             print(f"Correcting positions in parallel with {n_processes} processes...")
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             # Use imap to get results as they complete (allows progress tracking)
             import multiprocessing as mp
@@ -508,14 +526,17 @@ class ListGalaxyGroup:
                 results = []
                 for i, result in enumerate(pool.imap(ListGalaxyGroup._correct_positions_for_group, args_list), 1):
                     results.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
         else:
             results = []
-            for args in args_list:
-                print(f"Progress: Processing Galaxy Group ID {args[0].getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
+            for idx, args in enumerate(args_list):
+                if idx % print_interval == 0 or idx == total - 1:
+                    print(f"Progress: Processing Galaxy Group ID {args[0].getGroupID()} / {len(self.listGalaxyGroups)}", end='\r')
                 results.append(ListGalaxyGroup._correct_positions_for_group(args))
                 
         # self.setGalaxyGroups(results)
@@ -587,32 +608,38 @@ class ListGalaxyGroup:
             
             if parallize:
                 # Use imap to get results as they complete (allows progress tracking)
+                print_interval = max(1, total // 10)  # Print every ~10% of progress
                 import multiprocessing as mp
                 with mp.Pool(processes=n_processes) as pool:
                     serialized_data = []
                     for i, result in enumerate(pool.imap(serializer, args_list), 1):
                         serialized_data.append(result)
-                        percent = (i / total) * 100
-                        print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                        if i % print_interval == 0 or i == total:
+                            percent = (i / total) * 100
+                            print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                     print()  # New line after progress
             else:
                 print("Serializing galaxy group data sequentially...")
                 serialized_data = []
+                print_interval = max(1, total // 10)  # Print every ~10% of progress
                 for i, args in enumerate(args_list, 1):
                     result = serializer(args)
                     serialized_data.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rSerialization: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
             print("Writing serialized data to HDF5 file...")
             grp = h5file.create_group('GalaxyGroups')
             total = len(serialized_data)
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             for idx, group_data in enumerate(serialized_data, 1):
                 i = group_data['index']
-                percent = (idx / total) * 100
-                print(f"\rWriting: {idx}/{total} ({percent:.1f}%)", end='', flush=True)
+                if idx % print_interval == 0 or idx == total:
+                    percent = (idx / total) * 100
+                    print(f"\rWriting: {idx}/{total} ({percent:.1f}%)", end='', flush=True)
                 
                 gg_grp = grp.create_group(f'GalaxyGroup_{i}')
                 gg_grp.attrs['group_id'] = group_data['group_id']
@@ -678,6 +705,7 @@ class ListGalaxyGroup:
                 n_processes = get_optimal_processes(total)
             
             print(f"Loading from HDF5 in parallel with {n_processes} processes...")
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             
             # Create filename to pass to worker (HDF5 objects can't be pickled)
             h5_filename = h5file.filename
@@ -688,14 +716,17 @@ class ListGalaxyGroup:
                 results = []
                 for i, result in enumerate(pool.imap(ListGalaxyGroup._load_group_from_hdf5_auto, args_list), 1):
                     results.append(result)
-                    percent = (i / total) * 100
-                    print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
+                    if i % print_interval == 0 or i == total:
+                        percent = (i / total) * 100
+                        print(f"\rProgress: {i}/{total} ({percent:.1f}%)", end='', flush=True)
                 print()  # New line after progress
             
             self.listGalaxyGroups = results
         else:
+            print_interval = max(1, total // 10)  # Print every ~10% of progress
             for i, gg_key in enumerate(gg_keys):
-                print(f"Progress: {i+1}/{total}", end='\r')
+                if (i + 1) % print_interval == 0 or (i + 1) == total:
+                    print(f"Progress: {i+1}/{total}", end='\r')
                 galaxyGroup = ListGalaxyGroup._load_group_from_hdf5_auto((h5file.filename, gg_key))
                 self.listGalaxyGroups.append(galaxyGroup)
         

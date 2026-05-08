@@ -27,5 +27,39 @@ class SnapshotEnum(Enum):
         """Return a list of redshift values sorted in ascending order."""
         return sorted([snapshot.value[1] for snapshot in SnapshotEnum])
     
+    def getSnapshotEnumFromRedshift(redshift):
+        """Given a redshift value, return the corresponding SnapshotEnum member.
+
+        Args:
+            redshift (float): The redshift value to look up.
+        Returns:
+            SnapshotEnum: The enum member corresponding to the given redshift.
+        Raises:
+            ValueError: If no matching redshift is found in the enum.
+        """
+        for snapshot in SnapshotEnum:
+            if snapshot.value[1] == redshift:
+                return snapshot
+        raise ValueError(f"No SnapshotEnum member found for redshift {redshift}")
+    
+    def getSnapshotEnumFromName(name):
+        """Given a snapshot name (e.g. 'z0p0'), return the corresponding SnapshotEnum member.
+
+        Args:
+            name (str): The snapshot name to look up.
+        Returns:
+            SnapshotEnum: The enum member corresponding to the given name.
+        Raises:
+            ValueError: If no matching name is found in the enum.
+        """
+        for snapshot in SnapshotEnum:
+            if snapshot.value[2] == name:
+                return snapshot
+        raise ValueError(f"No SnapshotEnum member found for name {name}")
+    
+    def getRedshiftFromSnapshotEnum(snapshotEnum):
+        """Given a SnapshotEnum member, return its redshift value."""
+        return snapshotEnum.value[1]
+    
         
     

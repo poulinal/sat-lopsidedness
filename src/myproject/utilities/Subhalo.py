@@ -92,7 +92,11 @@ class Subhalo:
     
     def getJoiningRedshift(self, numR200:int=3):
         # print(self.joiningRedshift, np.isnan(self.joiningRedshift))
-        if isinstance(self.joiningRedshift, float) and np.isnan(self.joiningRedshift):
+        # if isinstance(self.joiningRedshift, float) and np.isnan(self.joiningRedshift):
+        #     return np.nan
+        joining_redshift_info = self.joiningRedshift
+        arr = np.asarray(joining_redshift_info)
+        if (arr.size == 1 and np.all(np.isnan(arr))):
             return np.nan
         else:
             # print(self.joiningRedshift)

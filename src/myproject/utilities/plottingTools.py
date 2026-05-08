@@ -7,10 +7,14 @@ with consistent styling suitable for academic publications.
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import warnings
+import importlib
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.colors import LogNorm, Normalize
+from matplotlib.collections import LineCollection
 import numpy as np
+import numpy.typing as npt
 from typing import Optional, Tuple, Union, List
 from scipy.interpolate import UnivariateSpline
 
@@ -27,94 +31,116 @@ class AstroPlotter:
     - Multi-panel figure support
     """
     
-    def __init__(self, style: str = 'publication', context: str = 'paper'):
+    def __init__(self, style: str = 'cms', context: str = 'paper'):
         """
         Initialize the AstroPlotter with specified style.
         
         Parameters
         ----------
         style : str, optional
-            Style preset ('publication', 'presentation', 'poster')
+            Style preset ('publication', 'presentation', 'poster', 'cms')
         context : str, optional
             Context for sizing ('paper', 'notebook', 'talk', 'poster')
         """
         self.style = style
         self.context = context
+        # Build rcparams dict but do not mutate global rcParams
+        self._rcparams = {}
         self._setup_style()
+        # small colorblind-friendly palette
+        self._palette = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#F0E442', '#56B4E9']
         
     def _setup_style(self):
         """Configure matplotlib settings for publication quality."""
-        # Font settings
-        plt.rcParams['font.family'] = 'serif'
-        plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif']
-        plt.rcParams['mathtext.fontset'] = 'dejavuserif'
-        
+        # Build a local rcparams dict rather than mutating global rcParams
+        rc = {}
+
+        if self.style.lower() == 'cms':
+            hep_spec = importlib.util.find_spec('mplhep')
+            if hep_spec is None:
+                warnings.warn(
+                    "style='cms' requested but mplhep is not installed. Falling back to default publication style.",
+                    RuntimeWarning,
+                )
+            else:
+                hep = importlib.import_module('mplhep')
+                rc.update(dict(hep.style.CMS))
+
+        # Publication defaults when not using CMS (or when CMS fallback is active)
+        if not rc:
+            rc['font.family'] = 'serif'
+            rc['font.serif'] = ['Times New Roman', 'DejaVu Serif']
+            rc['mathtext.fontset'] = 'dejavuserif'
+
         # Figure settings based on context
         if self.context == 'paper':
-            plt.rcParams['font.size'] = 10
-            plt.rcParams['axes.labelsize'] = 11
-            plt.rcParams['axes.titlesize'] = 12
-            plt.rcParams['xtick.labelsize'] = 9
-            plt.rcParams['ytick.labelsize'] = 9
-            plt.rcParams['legend.fontsize'] = 9
-            plt.rcParams['figure.figsize'] = (6, 4.5)
+            rc['font.size'] = 10
+            rc['axes.labelsize'] = 11
+            rc['axes.titlesize'] = 12
+            rc['xtick.labelsize'] = 9
+            rc['ytick.labelsize'] = 9
+            rc['legend.fontsize'] = 9
+            rc['figure.figsize'] = (6, 4.5)
         elif self.context == 'presentation':
-            plt.rcParams['font.size'] = 14
-            plt.rcParams['axes.labelsize'] = 16
-            plt.rcParams['axes.titlesize'] = 18
-            plt.rcParams['xtick.labelsize'] = 13
-            plt.rcParams['ytick.labelsize'] = 13
-            plt.rcParams['legend.fontsize'] = 13
-            plt.rcParams['figure.figsize'] = (10, 7.5)
+            rc['font.size'] = 14
+            rc['axes.labelsize'] = 16
+            rc['axes.titlesize'] = 18
+            rc['xtick.labelsize'] = 13
+            rc['ytick.labelsize'] = 13
+            rc['legend.fontsize'] = 13
+            rc['figure.figsize'] = (10, 7.5)
         elif self.context == 'poster':
-            plt.rcParams['font.size'] = 18
-            plt.rcParams['axes.labelsize'] = 22
-            plt.rcParams['axes.titlesize'] = 24
-            plt.rcParams['xtick.labelsize'] = 18
-            plt.rcParams['ytick.labelsize'] = 18
-            plt.rcParams['legend.fontsize'] = 18
-            plt.rcParams['figure.figsize'] = (12, 9)
-        
+            rc['font.size'] = 18
+            rc['axes.labelsize'] = 22
+            rc['axes.titlesize'] = 24
+            rc['xtick.labelsize'] = 18
+            rc['ytick.labelsize'] = 18
+            rc['legend.fontsize'] = 18
+            rc['figure.figsize'] = (12, 9)
+
         # Line and marker settings
-        plt.rcParams['lines.linewidth'] = 1.5
-        plt.rcParams['lines.markersize'] = 6
-        plt.rcParams['patch.linewidth'] = 0.5
-        
+        rc['lines.linewidth'] = 1.5
+        rc['lines.markersize'] = 6
+        rc['patch.linewidth'] = 0.5
+
         # Axes settings
-        plt.rcParams['axes.linewidth'] = 1.0
-        plt.rcParams['axes.grid'] = False
-        plt.rcParams['axes.axisbelow'] = True
-        plt.rcParams['axes.labelpad'] = 4.0
-        
+        rc['axes.linewidth'] = 1.0
+        rc['axes.grid'] = False
+        rc['axes.axisbelow'] = True
+        rc['axes.labelpad'] = 4.0
+
         # Tick settings
-        plt.rcParams['xtick.direction'] = 'in'
-        plt.rcParams['ytick.direction'] = 'in'
-        plt.rcParams['xtick.major.size'] = 5
-        plt.rcParams['xtick.minor.size'] = 3
-        plt.rcParams['ytick.major.size'] = 5
-        plt.rcParams['ytick.minor.size'] = 3
-        plt.rcParams['xtick.major.width'] = 1.0
-        plt.rcParams['xtick.minor.width'] = 0.8
-        plt.rcParams['ytick.major.width'] = 1.0
-        plt.rcParams['ytick.minor.width'] = 0.8
-        plt.rcParams['xtick.top'] = True
-        plt.rcParams['ytick.right'] = True
-        plt.rcParams['xtick.minor.visible'] = True
-        plt.rcParams['ytick.minor.visible'] = True
-        
+        rc['xtick.direction'] = 'in'
+        rc['ytick.direction'] = 'in'
+        rc['xtick.major.size'] = 5
+        rc['xtick.minor.size'] = 3
+        rc['ytick.major.size'] = 5
+        rc['ytick.minor.size'] = 3
+        rc['xtick.major.width'] = 1.0
+        rc['xtick.minor.width'] = 0.8
+        rc['ytick.major.width'] = 1.0
+        rc['ytick.minor.width'] = 0.8
+        rc['xtick.top'] = True
+        rc['ytick.right'] = True
+        rc['xtick.minor.visible'] = True
+        rc['ytick.minor.visible'] = True
+
         # Legend settings
-        plt.rcParams['legend.frameon'] = False
-        plt.rcParams['legend.numpoints'] = 1
-        plt.rcParams['legend.scatterpoints'] = 1
-        
+        rc['legend.frameon'] = False
+        rc['legend.numpoints'] = 1
+        rc['legend.scatterpoints'] = 1
+
         # Save settings
-        plt.rcParams['savefig.dpi'] = 300
-        plt.rcParams['savefig.bbox'] = 'tight'
-        plt.rcParams['savefig.pad_inches'] = 0.05
+        rc['savefig.dpi'] = 300
+        rc['savefig.bbox'] = 'tight'
+        rc['savefig.pad_inches'] = 0.05
+
+        self._rcparams = rc
         
     def create_figure(self, nrows: int = 1, ncols: int = 1, 
                      figsize: Optional[Tuple[float, float]] = None,
-                     **kwargs) -> Tuple[Figure, Union[Axes, np.ndarray[Axes]]]:
+                     constrained_layout: Optional[bool] = True,
+                     **kwargs) -> Tuple[Figure, Union[Axes, npt.NDArray[np.object_]]]:
         """
         Create a figure with subplots.
         
@@ -135,9 +161,15 @@ class AstroPlotter:
         ax : matplotlib.axes.Axes or array of Axes
         """
         if figsize is None:
-            figsize = plt.rcParams['figure.figsize']
+            figsize = self._rcparams.get('figure.figsize', plt.rcParams['figure.figsize'])
+
+        # Apply local style context per-figure so global rcParams are not mutated
+        with mpl.rc_context(self._rcparams):
+            fig, ax = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=constrained_layout, **kwargs)
         
-        fig, ax = plt.subplots(nrows, ncols, figsize=figsize, **kwargs)
+        # Ensure figure is set as current matplotlib figure for Jupyter auto-display
+        plt.sca(ax if isinstance(ax, Axes) else ax.flat[0] if hasattr(ax, 'flat') else ax)
+
         return fig, ax
     
     def scatter_plot(self, x: np.ndarray, y: np.ndarray, 
@@ -211,30 +243,99 @@ class AstroPlotter:
                 print("Warning: ax is a numpy array, using the first axes in the array.")
                 ax = ax.flat[0]
             fig = ax.figure
+        # Determine coloring strategy:
+        # - if `c` provided and is array-like: use it with cmap/norm
+        # - if `c` is a single color or overlay_color provided: use as solid color
+        # detect whether a drawstyle was requested so we can avoid forcing a color (allow color cycling)
+        drawstyle_present = 'drawstyle' in kwargs
 
-        # Validate the `c` parameter
-        if c is not None and overlay_color is None:
+        scatter_kwargs = dict(alpha=alpha, s=s)
+
+        if c is not None:
+            # check if c is a scalar color
+            is_scalar_color = False
             try:
-                # Check if `c` is a valid single color
                 mpl.colors.to_rgba(c)
-            except ValueError:
-                # If not, ensure `c` is an array of values
-                if not isinstance(c, (list, np.ndarray)):
-                    raise ValueError("The `c` parameter must be a valid color or an array of values.")
-        
-        # Handle color normalization
-        norm = None
-        if c is not None and clog:
-            norm = LogNorm(vmin=vmin, vmax=vmax)
-        elif c is not None:
-            norm = Normalize(vmin=vmin, vmax=vmax)
-        
-        # Use overlay_color if provided
-        scatter_color = overlay_color if overlay_color else c
+                is_scalar_color = True
+            except Exception:
+                is_scalar_color = False
 
-        # Create scatter plot
-        sc = ax.scatter(x, y, c=scatter_color, cmap=cmap, alpha=alpha, s=s, 
-                       norm=norm, **kwargs)
+            if is_scalar_color and overlay_color is None:
+                scatter_kwargs['color'] = c
+                norm = None
+            else:
+                # treat c as array of values to map
+                norm = LogNorm(vmin=vmin, vmax=vmax) if clog else Normalize(vmin=vmin, vmax=vmax)
+                scatter_kwargs['c'] = c
+                scatter_kwargs['cmap'] = cmap
+                scatter_kwargs['norm'] = norm
+        else:
+            # no c provided -> if drawstyle is requested, prefer leaving color unset so Matplotlib cycles colors
+            if drawstyle_present:
+                if overlay_color is not None:
+                    scatter_kwargs['color'] = overlay_color
+                # else: leave color unset to allow axes color cycling
+            else:
+                scatter_kwargs['color'] = overlay_color if overlay_color is not None else None # else self._palette[0] #use self._palette[0] to force same color
+
+        # Extract drawstyle (for step-style line plotting) so it isn't passed to PathCollection
+        drawstyle = None
+        if 'drawstyle' in kwargs:
+            drawstyle = kwargs.pop('drawstyle')
+
+        # merge any extra kwargs (marker, edgecolors, etc.)
+        scatter_kwargs.update(kwargs)
+
+        artist = None
+        # If a drawstyle is requested, use a line plot (supports drawstyle).
+        # If `c` is an array-like, construct a LineCollection so segments can be colored by `c`.
+        if drawstyle is not None:
+            line_kwargs = {}
+            if 'color' in scatter_kwargs:
+                line_kwargs['color'] = scatter_kwargs.get('color')
+            line_kwargs['alpha'] = scatter_kwargs.get('alpha', alpha)
+            line_kwargs['linewidth'] = scatter_kwargs.get('linewidth', 2)
+            marker = scatter_kwargs.get('marker', None)
+            if marker is not None:
+                line_kwargs['marker'] = marker
+
+            # If c is an array-like (per-point values), use LineCollection to color segments
+            cvals = scatter_kwargs.get('c', None)
+            is_c_array = False
+            if cvals is not None:
+                try:
+                    arr = np.asarray(cvals)
+                    if arr.ndim >= 1 and arr.size > 1:
+                        is_c_array = True
+                except Exception:
+                    is_c_array = False
+
+            if is_c_array:
+                # build segments between consecutive points
+                pts = np.array([x, y]).T.reshape(-1, 1, 2)
+                segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
+                # create LineCollection and map c to segments (length N-1)
+                seg_c = np.asarray(cvals)
+                if seg_c.size == arr.size and seg_c.size == len(x):
+                    seg_c = seg_c[:-1]
+                norm = LogNorm(vmin=vmin, vmax=vmax) if clog else Normalize(vmin=vmin, vmax=vmax)
+                lc = LineCollection(segs, cmap=cmap, norm=norm, linewidths=line_kwargs.get('linewidth', 2), alpha=line_kwargs.get('alpha', 1.0))
+                lc.set_array(seg_c)
+                ax.add_collection(lc)
+                artist = lc
+                # fallback: also respect drawstyle by plotting invisible step line for legend/steps appearance
+                try:
+                    ax.plot(x, y, drawstyle=drawstyle, color=line_kwargs.get('color', None), alpha=0.0)
+                except Exception:
+                    pass
+            else:
+                # plot as a line supporting drawstyle (e.g., 'steps-mid')
+                (ln,) = ax.plot(x, y, drawstyle=drawstyle, label=label if not spline_curvature else None, **line_kwargs)
+                artist = ln
+        else:
+            # Create scatter plot
+            sc = ax.scatter(x, y, **scatter_kwargs)
+            artist = sc
 
         if spline_curvature:
             # Sort data by x for spline fitting
@@ -245,10 +346,51 @@ class AstroPlotter:
             spline = UnivariateSpline(x_sorted, y_sorted, k=2, s=spline_smoothing if spline_smoothing is not None else 5)
             x_smooth = np.linspace(x_sorted.min(), x_sorted.max(), 300)
             # ax.plot(x_smooth, spline(x_smooth),'k--', alpha=0.5, linewidth=3, c=scatter_color, label=label)
-            ax.plot(x_smooth, spline(x_smooth),'--', alpha=0.5, linewidth=3, c=scatter_color, label=label)
+            ax.plot(x_smooth, spline(x_smooth),'--', alpha=0.5, linewidth=3, c=scatter_kwargs.get('color', None), label=label)
         
         if errorBars is not None:
-            ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=sc.get_facecolor()[0], alpha=0.5, capsize=2, **kwargs)
+            # Determine a reliable color for the error bars that matches the scatter points.
+            ecolor = None
+            # 1) If user explicitly set a color, use it
+            if 'color' in scatter_kwargs and scatter_kwargs.get('color') is not None:
+                ecolor = scatter_kwargs.get('color')
+
+            # 2) If artist is a PathCollection (scatter), inspect its facecolors
+            if ecolor is None and isinstance(artist, mpl.collections.PathCollection):
+                try:
+                    fc = artist.get_facecolors()
+                    if fc is not None and len(fc) > 0:
+                        # fc is an (N,4) array; use the first entry
+                        ecolor = fc[0]
+                except Exception:
+                    ecolor = None
+
+            # 3) If artist is a Line2D (from ax.plot), use its color
+            if ecolor is None and hasattr(artist, 'get_color'):
+                try:
+                    ecolor = artist.get_color()
+                except Exception:
+                    ecolor = None
+
+            # 4) Fallback: ask the axes for the next color in the cycle (useful when color was unset)
+            if ecolor is None:
+                try:
+                    prop_cycler = ax._get_lines.get_next_color if hasattr(ax, '_get_lines') else None
+                except Exception:
+                    prop_cycler = None
+                try:
+                    # Try retrieving last plotted artist color from the axes
+                    last_color = None
+                    if hasattr(artist, 'get_facecolor'):
+                        fc = artist.get_facecolor()
+                        if isinstance(fc, np.ndarray) and fc.size:
+                            last_color = fc[0]
+                    if last_color is not None:
+                        ecolor = last_color
+                except Exception:
+                    pass
+
+            ax.errorbar(x, y, yerr=errorBars, fmt='none', ecolor=ecolor, alpha=0.5, capsize=2)
             
         # Set scales
         if xlog:
@@ -274,14 +416,17 @@ class AstroPlotter:
                     title = title[:split_idx] + '\n' + title[split_idx + 1:]
             ax.set_title(title)
         if label and not spline_curvature:
-            sc.set_label(label)
+            try:
+                artist.set_label(label)
+            except Exception:
+                pass
             
         if grid:
             ax.grid(True, which='both', linestyle='--', alpha=0.5)
             
         # Colorbar
-        if c is not None and colorbar:
-            cbar = plt.colorbar(sc, ax=ax, pad=0.02)
+        if c is not None and colorbar and isinstance(artist, mpl.collections.PathCollection):
+            cbar = plt.colorbar(artist, ax=ax, pad=0.02)
             if clabel:
                 cbar.set_label(clabel)
         
@@ -663,16 +808,22 @@ class AstroPlotter:
         **kwargs
             Additional arguments for savefig
         """
-        # fig.savefig(filename, dpi=dpi, format=format, 
-        #            transparent=transparent, **kwargs)
-        #save png and pdf versions if doesnt end in .png or .pdf
-        if not filename.endswith('.png') and not filename.endswith('.pdf'):
-            fig.savefig(filename + '.png', dpi=dpi, format='png', transparent=transparent, **kwargs)
-            fig.savefig(filename + '.pdf', dpi=dpi, format='pdf', transparent=transparent, **kwargs)
-        else:
+        # Save respecting explicit extension when provided. If no extension,
+        # prefer vector (PDF) and also save a PNG raster for quick previews.
+        saved = []
+        if filename.lower().endswith('.pdf') or filename.lower().endswith('.png') or filename.lower().endswith('.svg'):
             fig.savefig(filename, dpi=dpi, format=format, transparent=transparent, **kwargs)
+            saved.append(filename)
+        else:
+            # save vector first
+            pdf_name = filename + '.pdf'
+            png_name = filename + '.png'
+            fig.savefig(pdf_name, dpi=dpi, format='pdf', transparent=transparent, **kwargs)
+            fig.savefig(png_name, dpi=dpi, format='png', transparent=transparent, **kwargs)
+            saved.extend([pdf_name, png_name])
 
-        print(f"Figure saved to: {filename}")
+        # return saved filenames for caller to use or inspect
+        return saved
     
     def add_text_box(self, ax: Axes, text: str, 
                     loc: str = 'upper right',
@@ -727,3 +878,64 @@ class AstroPlotter:
         
         ax.text(xy[0], xy[1], text, transform=ax.transAxes,
                fontsize=fontsize, bbox=props, ha=ha, va=va)
+
+    def add_legend(self, ax: Axes, title: Optional[str] = None,
+                   loc: str = 'upper right',
+                   fontsize: Optional[int] = None,
+                   **kwargs):
+        """
+        Add a legend to the plot.
+        
+        Parameters
+        ----------
+        ax : Axes
+            Axes to add legend to
+        title : str, optional
+            Legend title
+        loc : str
+            Location ('upper right', 'lower left', 'upper left', 'lower right', 'center')
+        fontsize : int, optional
+            Font size
+        **kwargs
+            Additional arguments for legend properties
+        """
+        legend = ax.legend(loc=loc, fontsize=fontsize, title=title, **kwargs)
+        if title:
+            legend.get_title().set_fontsize(fontsize if fontsize else 10)
+            
+    def add_annotation(self, text: str, ax: Axes, xy: Tuple[float, float], 
+                    xytext: Optional[Tuple[float, float]] = None,
+                    arrowprops: Optional[dict] = None,
+                    fontsize: Optional[int] = None,
+                    **kwargs):
+        """
+        Add an annotation with an optional arrow.
+        
+        Parameters
+        ----------
+        ax : Axes
+            Axes to add annotation to
+        text : str
+            Annotation text
+        xy : tuple
+            Point (x, y) to annotate
+        xytext : tuple, optional
+            Position (x, y) for the text (if different from xy)
+        arrowprops : dict, optional
+            Properties for the arrow (if xytext is provided)
+        fontsize : int, optional
+            Font size for the annotation text
+        fontweight : str, optional
+            Font weight for the annotation text (e.g., 'light', 'normal', 'bold')
+        **kwargs
+            Additional arguments for annotation properties
+        """
+        if fontsize is not None:
+            kwargs['fontsize'] = fontsize
+
+        # Default to a lighter font weight to reduce perceived "thickness"
+        # unless the caller explicitly requests a different weight.
+        if 'fontweight' not in kwargs and 'weight' not in kwargs:
+            kwargs['fontweight'] = 'light'
+
+        ax.annotate(text, xy=xy, xytext=xytext, arrowprops=arrowprops, **kwargs)
