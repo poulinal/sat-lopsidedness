@@ -273,10 +273,24 @@ class AstroPlotter:
             # no c provided -> if drawstyle is requested, prefer leaving color unset so Matplotlib cycles colors
             if drawstyle_present:
                 if overlay_color is not None:
-                    scatter_kwargs['color'] = overlay_color
+                    # Validate color before using it
+                    try:
+                        mpl.colors.to_rgba(overlay_color)
+                        scatter_kwargs['color'] = overlay_color
+                    except (ValueError, AttributeError):
+                        # Invalid color; leave unset to allow axes color cycling
+                        pass
                 # else: leave color unset to allow axes color cycling
             else:
-                scatter_kwargs['color'] = overlay_color if overlay_color is not None else None # else self._palette[0] #use self._palette[0] to force same color
+                # Only set color if it's valid; otherwise leave unset for auto-cycling
+                if overlay_color is not None:
+                    try:
+                        mpl.colors.to_rgba(overlay_color)
+                        scatter_kwargs['color'] = overlay_color
+                    except (ValueError, AttributeError):
+                        # Invalid color; skip it and let Matplotlib cycle colors
+                        pass
+                # scatter_kwargs['color'] = overlay_color if overlay_color is not None else None # else self._palette[0] #use self._palette[0] to force same color
 
         # Extract drawstyle (for step-style line plotting) so it isn't passed to PathCollection
         drawstyle = None

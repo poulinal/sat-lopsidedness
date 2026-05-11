@@ -50,7 +50,11 @@ class ListGalaxyGroup:
     load_from_hdf5(h5file : h5.File) -> None
         Loads the ListGalaxyGroup data from an HDF5 file.
     """
-    def __init__(self, listGalaxyGroups : list[GalaxyGroup]=[], headerInformation : dict={}):
+    def __init__(self, listGalaxyGroups : list[GalaxyGroup]=None, headerInformation : dict=None):
+        if listGalaxyGroups is None:
+            listGalaxyGroups = []
+        if headerInformation is None:
+            headerInformation = {}
         # self.listGalaxyGroups = listGalaxyGroups
         # self.lenGalaxyGroups = len(self.listGalaxyGroups)
         self.setGalaxyGroups(listGalaxyGroups)

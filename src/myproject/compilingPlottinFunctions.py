@@ -1,6 +1,7 @@
 #AP 2026
 
 #try a different method:
+from myproject.redshiftGalaxyAnalysis import GalaxyAnalysis
 from myproject.utilities.snapshotEnum import SnapshotEnum
 from myproject.utilities.plottingTools import AstroPlotter
 from myproject.utilities.ListGalaxyGroup import ListGalaxyGroup
@@ -19,7 +20,7 @@ def asymetryPlots(
     plotter=None,
     title=None,
     massColors=None,
-):
+    ):
     """Plot asymmetry curves on either a fresh axis or a provided axis (for multipanel use)."""
     if massColors==None:
         #standard matplotlib colors for up to 10 lines, will cycle if more than 10 mass bins
@@ -228,13 +229,13 @@ def getConsistentInconsistentPolarMRLPlots(
         consistent_polar_differences,
         bins=bin,
         errorbarType="poisson",
-        normalize_to_one=True,
+        density=True,
     )
     inconsistent_bin_values, inconsistent_bin_centers, inconsistent_bin_errorbars = ListGalaxyGroup.get_histogram_bins(
         inconsistent_polar_differences,
         bins=bin,
         errorbarType="poisson",
-        normalize_to_one=True,
+        density=True,
     )
 
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -295,7 +296,7 @@ def getConsistentInconsistentPolarMRLPlots(
         polar_ax.grid(True, alpha=0.3)
 
     #make random distribution line at 1/180 on across the y axis
-    polar_ax.axhline(1/18, color='gray', linestyle='--')#, label='Random Distribution (1/180)')
+    polar_ax.axhline(1/180, color='gray', linestyle='--')#, label='Random Distribution (1/180)')
 
     frac_inconsistent = (
         len(inconsistent_polar_differences) / (len(consistent_polar_differences) + len(inconsistent_polar_differences))
