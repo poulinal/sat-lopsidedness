@@ -139,9 +139,12 @@ def asymetryPlots(
 
     polarPairwiseDifference_ax.set_xlabel('Redshift')
     polarPairwiseDifference_ax.set_ylabel('N(<90º) - N(>=90º)')
+    # make ax have tick marks at every 30 degrees
+    # polarPairwiseDifference_ax.set_xticks(np.arange(0, 181, 30))
+    
     if title is not None:
         polarPairwiseDifference_ax.set_title(title)
-    polarPairwiseDifference_ax.legend(fontsize=6)
+    polarPairwiseDifference_ax.legend(fontsize=8)
 
     return (
         polarPairwiseDifference_plotter,
@@ -221,9 +224,9 @@ def getConsistentInconsistentPolarMRLPlots(
     bin = np.arange(0, 185, 10)
     xlabel = "Pairwise Polar Difference (degrees)"
     ylabel = "Probability Density"
-    title = polar_title if polar_title is not None else (
-        f"P($\delta \phi$) Distribution (TNG300-1, TNG-Cluster; {percentConfidenceMRL} CL)"
-    )
+    title = polar_title if polar_title is not None else None# (
+    #     f"P($\delta \phi$) Distribution (TNG300-1, TNG-Cluster; {percentConfidenceMRL} CL)"
+    # )
 
     consistent_bin_values, consistent_bin_centers, consistent_bin_errorbars = ListGalaxyGroup.get_histogram_bins(
         consistent_polar_differences,
@@ -250,7 +253,7 @@ def getConsistentInconsistentPolarMRLPlots(
             ax=polar_ax,
             xlabel=xlabel,
             ylabel=ylabel,
-            title=title,
+            # title=title,
             label=f"Consistent MRL projections (N={len(consistent_polar_differences)})",
             output_filename=None,
             grid=True,
@@ -262,7 +265,7 @@ def getConsistentInconsistentPolarMRLPlots(
             ax=polar_ax,
             xlabel=xlabel,
             ylabel=ylabel,
-            title=title,
+            # title=title,
             label=f"Inconsistent MRL projections (N={len(inconsistent_polar_differences)})",
             output_filename=None,
             grid=True,
@@ -292,7 +295,7 @@ def getConsistentInconsistentPolarMRLPlots(
         )
         polar_ax.set_xlabel(xlabel)
         polar_ax.set_ylabel(ylabel)
-        polar_ax.set_title(title)
+        # polar_ax.set_title(title)
         polar_ax.grid(True, alpha=0.3)
 
     #make random distribution line at 1/180 on across the y axis
@@ -349,9 +352,9 @@ def getConsistentInconsistentPolarMRLPlots(
     bin = np.arange(0, 1.05, 0.05)
     xlabel = 'MRL Value'
     ylabel = 'Probability Density'
-    title = mrl_title if mrl_title is not None else (
-        'MRL Value Distribution for TNG300-1, TNG-Cluster Combined Galaxy Groups, Consistent vs Inconsistent Projections'
-    )
+    title = mrl_title if mrl_title is not None else None #(
+        # 'MRL Value Distribution for TNG300-1, TNG-Cluster Combined Galaxy Groups, Consistent vs Inconsistent Projections'
+    # )
 
     def _empty_histogram():
         centers = 0.5 * (bin[:-1] + bin[1:])
@@ -460,7 +463,7 @@ def getConsistentInconsistentPolarMRLPlots(
             ax=mrl_ax,
             xlabel=xlabel,
             ylabel=ylabel,
-            title=title,
+            # title=title,
             label=f"Consistent projections (N={len(consistent_MRL_values)})",
             output_filename=None,
             grid=True,
@@ -472,7 +475,7 @@ def getConsistentInconsistentPolarMRLPlots(
             ax=mrl_ax,
             xlabel=xlabel,
             ylabel=ylabel,
-            title=title,
+            # title=title,
             label=f"Inconsistent projections (N={len(inconsistent_MRL_values)})",
             output_filename=None,
             grid=True,
@@ -518,7 +521,7 @@ def getConsistentInconsistentPolarMRLPlots(
         )
         mrl_ax.set_xlabel(xlabel)
         mrl_ax.set_ylabel(ylabel)
-        mrl_ax.set_title(title)
+        # mrl_ax.set_title(title)
         mrl_ax.grid(True, alpha=0.3)
 
         #if consistent and consistent are near zero at 0.6, trim xlim to zoom in on the region with data
@@ -621,9 +624,9 @@ def getConsistentInconsistentAssymetryPlots(
         redshifts.append(snapshot_enum[1])
         redshift_mass_bins.append([high_list_galaxy_groups, non_high_list_galaxy_groups])
 
-    panel_title = title if title is not None else (
-        f"P($\delta \phi$) Difference for Consistent vs. Inconsistent GG ({mass_bin_label})"
-    )
+    panel_title = title if title is not None else None #(
+        # f"P($\delta \phi$) Difference for Consistent vs. Inconsistent GG ({mass_bin_label})"
+    # )
 
     assymetry_plotter, assymetry_fig, assymetry_ax, assymetry_by_type_by_redshift = asymetryPlots(
         redshifts,
@@ -637,7 +640,7 @@ def getConsistentInconsistentAssymetryPlots(
         ax=ax,
         fig=fig,
         plotter=plotter,
-        title=panel_title,
+        # title=panel_title,
     )
 
     return assymetry_plotter, assymetry_fig, assymetry_ax, assymetry_by_type_by_redshift
